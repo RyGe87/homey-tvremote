@@ -44,6 +44,24 @@ The widget finds the television by itself: it picks the first device from the
 Android TV app. With one television in the house there is nothing to
 configure.
 
-## License
+## Credits and licensing
 
-[MIT](LICENSE)
+The code in this repository is **[MIT](LICENSE)** licensed and was written
+from scratch. Two things it builds on deserve a precise word, because their
+terms differ:
+
+- **[drenso/homey-android-tv](https://github.com/drenso/homey-android-tv)**
+  (GPL-3.0) does the real work: pairing with the television and speaking the
+  Android TV Remote protocol. This widget contains **no code from that
+  project**. It only operates the Homey device that app creates, through
+  Homey's public API — the way any Homey app may control any device. The
+  capability and key names used here (`key_confirm`, `key_options`, …) are
+  interface identifiers read from its public flow cards, not copied source.
+  Install that app; this widget is useless without it.
+- **`homey-api`**, the npm package used to reach Homey's API, is
+  **proprietary to Athom B.V.** and free to use with Homey products. It is a
+  declared dependency, not redistributed here (`node_modules` is ignored), so
+  installing this app fetches it from npm under Athom's terms.
+
+In short: this repository is MIT, but the stack it runs on is not entirely —
+and neither the GPL app nor the Athom package is relicensed by anything here.
