@@ -1,0 +1,10 @@
+{
+  "name": "dev.rymenants.tvremote",
+  "version": "1.0.0",
+  "main": "app.js",
+  "license": "MIT",
+  "description": "Homey dashboard widget with a usable TV remote layout",
+  "dependencies": {
+    "homey-api": "^3.0.0"
+  }
+}

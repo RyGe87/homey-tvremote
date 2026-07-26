@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      margin: 0;
+      padding: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--homey-text-color, #14161c);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100vh;
+      user-select: none;
+    }
+
+    .row { display: flex; gap: 8px; }
+    .row > * { flex: 1; }
+
+    button {
+      font: inherit;
+      font-size: 15px;
+      color: inherit;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 6px;
+      background: var(--homey-color-mono-100, rgba(127, 137, 160, 0.16));
+      cursor: pointer;
+      transition: transform 0.06s ease, background 0.15s ease;
+    }
+    button:active, button.flash {
+      background: var(--homey-color-blue-500, #1f7aec);
+      color: #fff;
+      transform: scale(0.96);
+    }
+
+    .power { background: var(--homey-color-red-100, rgba(226, 74, 74, 0.16)); font-size: 18px; }
+    .power.on { background: var(--homey-color-green-100, rgba(46, 173, 110, 0.2)); }
+
+    /* Touchpad */
+    .pad {
+      position: relative;
+      flex: 1;
+      min-height: 150px;
+      border-radius: 18px;
+      background: var(--homey-color-mono-050, rgba(127, 137, 160, 0.1));
+      border: 1px solid var(--homey-color-mono-100, rgba(127, 137, 160, 0.18));
+      display: grid;
+      place-items: center;
+      touch-action: none;
+      overflow: hidden;
+    }
+    .pad .ok {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      opacity: 0.75;
+      pointer-events: none;
+    }
+    .pad .hint {
+      position: absolute;
+      font-size: 15px;
+      opacity: 0.3;
+      pointer-events: none;
+    }
+    .hint.up { top: 8px; }
+    .hint.down { bottom: 8px; }
+    .hint.left { left: 12px; }
+    .hint.right { right: 12px; }
+
+    .pad.pulse::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: var(--homey-color-blue-500, #1f7aec);
+      opacity: 0.22;
+    }
+
+    .status {
+      font-size: 12px;
+      text-align: center;
+      opacity: 0.6;
+      min-height: 15px;
+    }
+    .status.error { color: var(--homey-color-red-500, #e24a4a); opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="row">
+    <button class="power" id="power" title="Aan/uit">&#9211;</button>
+    <button data-button="mute" title="Dempen">&#128263;</button>
+    <button data-button="volume_down" title="Zachter">&#8722;</button>
+    <button data-button="volume_up" title="Harder">&#43;</button>
+  </div>
+
+  <div class="pad" id="pad">
+    <span class="hint up">&#9650;</span>
+    <span class="hint down">&#9660;</span>
+    <span class="hint left">&#9664;</span>
+    <span class="hint right">&#9654;</span>
+    <span class="ok">OK</span>
+  </div>
+
+  <div class="row">
+    <button data-button="back">Terug</button>
+    <button data-button="exit">Exit</button>
+    <button data-button="info">&#8505;</button>
+  </div>
+
+  <div class="row">
+    <button data-button="previous">&#9198; Vorige</button>
+    <button data-button="next">Volgende &#9197;</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <script>
+    // Swiping further than this fires one cursor step; a shorter gesture is a tap.
+    const STEP = 26;
+
+    let homey = null;
+    const statusEl = document.getElementById('status');
+
+    function say(message, isError) {
+      statusEl.textContent = message || '';
+      statusEl.classList.toggle('error', Boolean(isError));
+    }
+
+    async function press(button) {
+      try {
+        const result = await homey.api('POST', '/press', { button });
+        if (result && typeof result.on === 'boolean') markPower(result.on);
+        say('');
+      } catch (err) {
+        say(err && err.message ? err.message : 'Kon de opdracht niet versturen', true);
+      }
+    }
+
+    function markPower(on) {
+      document.getElementById('power').classList.toggle('on', Boolean(on));
+    }
+
+    function flash(el) {
+      el.classList.add('flash');
+      setTimeout(() => el.classList.remove('flash'), 120);
+    }
+
+    function wireButtons() {
+      document.querySelectorAll('[data-button]').forEach(el => {
+        el.addEventListener('click', () => {
+          flash(el);
+          press(el.dataset.button);
+        });
+      });
+      document.getElementById('power').addEventListener('click', () => press('power'));
+    }
+
+    /** Touchpad: a short tap confirms, dragging steps through the menu. A long
+     *  drag keeps stepping, so holding and moving scrolls a list naturally. */
+    function wirePad() {
+      const pad = document.getElementById('pad');
+      let originX = 0;
+      let originY = 0;
+      let moved = false;
+
+      const pulse = () => {
+        pad.classList.add('pulse');
+        setTimeout(() => pad.classList.remove('pulse'), 110);
+      };
+
+      pad.addEventListener('pointerdown', event => {
+        pad.setPointerCapture(event.pointerId);
+        originX = event.clientX;
+        originY = event.clientY;
+        moved = false;
+      });
+
+      pad.addEventListener('pointermove', event => {
+        const dx = event.clientX - originX;
+        const dy = event.clientY - originY;
+        if (Math.abs(dx) < STEP && Math.abs(dy) < STEP) return;
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+          press(dx > 0 ? 'right' : 'left');
+          originX = event.clientX;
+        } else {
+          press(dy > 0 ? 'down' : 'up');
+          originY = event.clientY;
+        }
+        moved = true;
+        pulse();
+      });
+
+      pad.addEventListener('pointerup', () => {
+        if (!moved) {
+          press('ok');
+          pulse();
+        }
+      });
+    }
+
+    function onHomeyReady(Homey) {
+      homey = Homey;
+      wireButtons();
+      wirePad();
+      Homey.ready();
+
+      Homey.api('GET', '/status', {})
+        .then(result => {
+          if (!result || !result.found) {
+            say('Geen Android TV-apparaat gevonden', true);
+            return;
+          }
+          markPower(result.on);
+          if (!result.available) say(result.name + ' is niet bereikbaar');
+        })
+        .catch(() => say('Kon de status niet ophalen', true));
+    }
+  </script>
+</body>
+</html>

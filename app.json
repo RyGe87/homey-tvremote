@@ -1,0 +1,55 @@
+{
+  "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
+  "id": "dev.rymenants.tvremote",
+  "version": "1.0.0",
+  "compatibility": ">=12.3.0",
+  "sdk": 3,
+  "platforms": [
+    "local"
+  ],
+  "name": {
+    "en": "TV Remote Widget",
+    "nl": "Afstandsbediening-widget"
+  },
+  "description": {
+    "en": "A proper remote control layout on your Homey dashboard, with a touchpad",
+    "nl": "Een echte afstandsbediening op je Homey-dashboard, met touchpad"
+  },
+  "category": [
+    "tools"
+  ],
+  "brandColor": "#3b3f52",
+  "permissions": [
+    "homey:manager:api"
+  ],
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
+  },
+  "author": {
+    "name": "Geert Rymenants",
+    "email": "rymenants.geert@me.com"
+  },
+  "widgets": {
+    "remote": {
+      "name": {
+        "en": "TV remote",
+        "nl": "Afstandsbediening"
+      },
+      "height": 460,
+      "settings": [],
+      "api": {
+        "press": {
+          "method": "POST",
+          "path": "/press"
+        },
+        "status": {
+          "method": "GET",
+          "path": "/status"
+        }
+      },
+      "id": "remote"
+    }
+  }
+}

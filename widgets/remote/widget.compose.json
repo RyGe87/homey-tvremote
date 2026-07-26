@@ -1,0 +1,18 @@
+{
+  "name": {
+    "en": "TV remote",
+    "nl": "Afstandsbediening"
+  },
+  "height": 460,
+  "settings": [],
+  "api": {
+    "press": {
+      "method": "POST",
+      "path": "/press"
+    },
+    "status": {
+      "method": "GET",
+      "path": "/status"
+    }
+  }
+}
