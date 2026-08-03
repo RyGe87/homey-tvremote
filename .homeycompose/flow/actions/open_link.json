@@ -1,0 +1,12 @@
+{
+  "title": { "en": "Open a link", "nl": "Open een link" },
+  "titleFormatted": { "en": "Open [[link]]", "nl": "Open [[link]]" },
+  "hint": {
+    "en": "An app link, for instance https://www.youtube.com/results?search_query=jazz",
+    "nl": "Een app-link, bijvoorbeeld https://www.youtube.com/results?search_query=jazz"
+  },
+  "args": [
+    { "name": "device", "type": "device", "filter": "driver_id=tv" },
+    { "name": "link", "type": "text", "title": { "en": "Link", "nl": "Link" }, "placeholder": { "en": "https://…", "nl": "https://…" } }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "title": { "en": "Type text", "nl": "Typ tekst" },
+  "titleFormatted": { "en": "Type [[text]] into the selected field", "nl": "Typ [[text]] in het geselecteerde veld" },
+  "hint": {
+    "en": "Only works while a text field is selected on screen.",
+    "nl": "Werkt alleen wanneer er op het scherm een tekstvak geselecteerd staat."
+  },
+  "args": [
+    { "name": "device", "type": "device", "filter": "driver_id=tv" },
+    { "name": "text", "type": "text", "title": { "en": "Text", "nl": "Tekst" }, "placeholder": { "en": "jazz piano", "nl": "jazz piano" } }
+  ]
+}

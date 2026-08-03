@@ -144,27 +144,6 @@
        near-white, leaving the label unreadable until the button was held. */
     .primary { background: rgba(31, 122, 236, 0.22); font-weight: 600; }
 
-    .pairbox {
-      border-top: 1px solid var(--homey-color-mono-100, rgba(127, 137, 160, 0.2));
-      padding-top: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    #paircode {
-      font: inherit;
-      font-size: 16px;
-      letter-spacing: 0.18em;
-      text-align: center;
-      text-transform: uppercase;
-      color: inherit;
-      padding: 12px 8px;
-      border-radius: 12px;
-      border: 1px solid var(--homey-color-mono-100, rgba(127, 137, 160, 0.25));
-      background: var(--homey-color-mono-050, rgba(127, 137, 160, 0.1));
-      -webkit-appearance: none;
-      min-width: 0;
-    }
 
     /* The search screen can outgrow the widget once pairing is shown. */
     .screen.scrolls { overflow-y: auto; }
@@ -227,37 +206,11 @@
         <button id="sendtext" class="primary">&#9998; Stuur naar het veld op de tv</button>
       </div>
 
-      <div class="pairbox">
-        <div class="row">
-          <!-- Not inputmode="decimal": that yields a number pad whose only
-               separator is the locale one, a comma here, so the dots cannot
-               be typed at all. The url keyboard does have a full stop. -->
-          <input type="text" id="pairip" placeholder="192.168.0.100"
-                 inputmode="url" autocomplete="off" autocapitalize="off"
-                 autocorrect="off" spellcheck="false">
-          <button id="hostsave">Adres bewaren</button>
-        </div>
-
-        <div id="pairbox" hidden>
-          <p class="explain">
-            Deze widget praat rechtstreeks met de tv. Koppel één keer: vul het
-            IP-adres in en typ daarna de code over die op het scherm verschijnt.
-          </p>
-          <div class="row">
-            <button id="pairstart">Koppelen met de tv</button>
-          </div>
-          <div class="row" id="pairconfirm" hidden>
-            <input type="text" id="paircode" placeholder="Code van het scherm"
-                   inputmode="latin" autocapitalize="characters" maxlength="6">
-            <button id="pairsend">Bevestig</button>
-          </div>
-        </div>
-      </div>
 
       <p class="explain">
         De bovenste twee knoppen openen zoekresultaten rechtstreeks. Staat er een
         zoekveld open op de tv, dan zet de knop daaronder je hele term er in
-        één keer in.
+        één keer in. Koppelen doe je bij het toevoegen van het apparaat.
       </p>
     </section>
 
@@ -412,13 +365,6 @@
 
     /** Real text input needs its own pairing, so the offer only appears
      *  while that has not happened yet. */
-    /** Only the pairing offer is hidden once paired. The send button stays
-     *  enabled on purpose: a disabled button swallows the tap and then
-     *  nothing at all happens, which looks like a broken widget instead of
-     *  an explainable error. */
-    function showPairing(paired) {
-      document.getElementById('pairbox').hidden = Boolean(paired);
-    }
 
     function wireText() {
       const term = document.getElementById('term');
@@ -443,53 +389,6 @@
       });
     }
 
-    function wirePairing() {
-      const save = document.getElementById('hostsave');
-      save.addEventListener('click', async () => {
-        flash(save);
-        try {
-          const result = await homey.api('POST', '/host', { ip: document.getElementById('pairip').value });
-          say(`Adres bewaard: ${result.ip}`);
-        } catch (err) {
-          say(err && err.message ? err.message : 'Adres bewaren lukte niet', true);
-        }
-      });
-
-      const start = document.getElementById('pairstart');
-      const confirm = document.getElementById('pairconfirm');
-      const code = document.getElementById('paircode');
-      const send = document.getElementById('pairsend');
-
-      start.addEventListener('click', async () => {
-        flash(start);
-        start.disabled = true;
-        say('Verbinden met de tv…');
-        try {
-          await homey.api('POST', '/pair/start', { ip: document.getElementById('pairip').value });
-          confirm.hidden = false;
-          code.focus();
-          say('Typ de code die nu op je tv staat');
-        } catch (err) {
-          say(err && err.message ? err.message : 'Koppelen lukte niet', true);
-        }
-        start.disabled = false;
-      });
-
-      send.addEventListener('click', async () => {
-        flash(send);
-        send.disabled = true;
-        say('Code controleren…');
-        try {
-          await homey.api('POST', '/pair/code', { code: code.value });
-          confirm.hidden = true;
-          showPairing(true);
-          say('Gekoppeld — tekst versturen kan nu');
-        } catch (err) {
-          say(err && err.message ? err.message : 'De code werd niet aanvaard', true);
-        }
-        send.disabled = false;
-      });
-    }
 
 
     /** Waking runs in the app and can take a minute and a half, so the
@@ -547,7 +446,6 @@
       wireScreens();
       wireSearch();
       wireText();
-      wirePairing();
       wireWake();
       Homey.ready();
 
@@ -558,10 +456,8 @@
             return;
           }
           markPower(result.on);
-          showPairing(result.paired);
-          if (result.host) document.getElementById('pairip').value = result.host;
           if (result.waking) followWake();
-          else if (!result.paired) say('Nog niet gekoppeld — zie het zoekscherm');
+          else if (!result.paired) say('Nog niet gekoppeld: voeg de tv toe als apparaat', true);
           else if (!result.available) say('De tv is niet bereikbaar (slaapt hij?)');
         })
         .catch(() => say('Kon de status niet ophalen', true));

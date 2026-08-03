@@ -1,0 +1,70 @@
+{
+  "name": {
+    "en": "Android TV",
+    "nl": "Android TV"
+  },
+  "class": "tv",
+  "capabilities": [
+    "onoff",
+    "volume_up",
+    "volume_down",
+    "volume_mute"
+  ],
+  "platforms": ["local"],
+  "connectivity": ["lan"],
+  "images": {
+    "small": "{{driverAssetsPath}}/images/small.png",
+    "large": "{{driverAssetsPath}}/images/large.png"
+  },
+  "settings": [
+    {
+      "id": "ip",
+      "type": "text",
+      "label": {
+        "en": "IP address",
+        "nl": "IP-adres"
+      },
+      "value": "",
+      "hint": {
+        "en": "Where the television lives. Give it a fixed address in your router: the pairing survives a change of address, but nothing can reach it until this is corrected.",
+        "nl": "Waar de televisie zit. Geef haar een vast adres in je router: de koppeling overleeft een adreswijziging, maar er raakt niets meer bij tot dit is aangepast."
+      }
+    }
+  ],
+  "pair": [
+    {
+      "id": "configure",
+      "navigation": {
+        "next": "code"
+      }
+    },
+    {
+      "id": "code",
+      "navigation": {
+        "prev": "configure"
+      }
+    },
+    {
+      "id": "list_devices",
+      "template": "list_devices",
+      "navigation": {
+        "next": "add_devices"
+      }
+    },
+    {
+      "id": "add_devices",
+      "template": "add_devices"
+    }
+  ],
+  "repair": [
+    {
+      "id": "configure",
+      "navigation": {
+        "next": "code"
+      }
+    },
+    {
+      "id": "code"
+    }
+  ]
+}

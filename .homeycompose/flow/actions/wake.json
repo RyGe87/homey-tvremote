@@ -1,0 +1,10 @@
+{
+  "title": { "en": "Wake the television", "nl": "Wek de televisie" },
+  "hint": {
+    "en": "Sends magic packets and keeps offering the power command for up to ninety seconds.",
+    "nl": "Stuurt magic packets en blijft tot negentig seconden lang het aan-commando aanbieden."
+  },
+  "args": [
+    { "name": "device", "type": "device", "filter": "driver_id=tv" }
+  ]
+}

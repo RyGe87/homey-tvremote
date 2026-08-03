@@ -27,6 +27,38 @@ const KEYS = {
   power: 'KEYCODE_POWER',
 };
 
+// Offered in the flow card. The protocol knows some three hundred key codes;
+// this is the handful anyone actually puts in a flow.
+const FLOW_KEYS = [
+  { id: 'KEYCODE_POWER', name: 'Aan/uit' },
+  { id: 'KEYCODE_HOME', name: 'Home' },
+  { id: 'KEYCODE_BACK', name: 'Terug' },
+  { id: 'KEYCODE_MENU', name: 'Menu' },
+  { id: 'KEYCODE_DPAD_UP', name: 'Omhoog' },
+  { id: 'KEYCODE_DPAD_DOWN', name: 'Omlaag' },
+  { id: 'KEYCODE_DPAD_LEFT', name: 'Links' },
+  { id: 'KEYCODE_DPAD_RIGHT', name: 'Rechts' },
+  { id: 'KEYCODE_DPAD_CENTER', name: 'OK' },
+  { id: 'KEYCODE_MEDIA_PLAY_PAUSE', name: 'Afspelen / pauzeren' },
+  { id: 'KEYCODE_MEDIA_PLAY', name: 'Afspelen' },
+  { id: 'KEYCODE_MEDIA_PAUSE', name: 'Pauzeren' },
+  { id: 'KEYCODE_MEDIA_STOP', name: 'Stoppen' },
+  { id: 'KEYCODE_MEDIA_NEXT', name: 'Volgende' },
+  { id: 'KEYCODE_MEDIA_PREVIOUS', name: 'Vorige' },
+  { id: 'KEYCODE_MEDIA_FAST_FORWARD', name: 'Vooruitspoelen' },
+  { id: 'KEYCODE_MEDIA_REWIND', name: 'Terugspoelen' },
+  { id: 'KEYCODE_VOLUME_UP', name: 'Volume harder' },
+  { id: 'KEYCODE_VOLUME_DOWN', name: 'Volume zachter' },
+  { id: 'KEYCODE_VOLUME_MUTE', name: 'Dempen' },
+  { id: 'KEYCODE_MUTE', name: 'Microfoon dempen' },
+  { id: 'KEYCODE_SEARCH', name: 'Zoeken' },
+  { id: 'KEYCODE_TV_INPUT', name: 'Bron kiezen' },
+  { id: 'KEYCODE_CHANNEL_UP', name: 'Kanaal omhoog' },
+  { id: 'KEYCODE_CHANNEL_DOWN', name: 'Kanaal omlaag' },
+  { id: 'KEYCODE_ENTER', name: 'Enter' },
+  { id: 'KEYCODE_DEL', name: 'Wissen' },
+];
+
 // Magic packets go to the discard (9) and echo (7) ports, a few times each:
 // a sleeping network card easily misses a single datagram.
 const WOL_PORTS = [9, 7];
@@ -41,6 +73,7 @@ class TvRemoteApp extends Homey.App {
 
   async onInit() {
     this.log('TV Remote widget app started');
+    this.registerFlowCards();
 
     // Connect straight away so the log shows whether this will work at all.
     this.tryConnection()
@@ -51,6 +84,38 @@ class TvRemoteApp extends Homey.App {
   }
 
   // -------------------------------------------------------------------
+  // Flow cards
+  // -------------------------------------------------------------------
+
+  registerFlowCards() {
+    this.homey.flow.getActionCard('press_key')
+      .registerRunListener(async ({ key }) => {
+        const connection = await this.connection();
+        connection.sendKey(key.id);
+        return true;
+      })
+      .registerArgumentAutocompleteListener('key', async query => {
+        const term = String(query || '').toLowerCase();
+        return FLOW_KEYS
+          .filter(k => k.name.toLowerCase().includes(term) || k.id.toLowerCase().includes(term))
+          .map(k => ({ id: k.id, name: k.name }));
+      });
+
+    this.homey.flow.getActionCard('send_text')
+      .registerRunListener(async ({ text }) => {
+        const result = await this.sendText(text);
+        if (!result.ok) throw new Error(result.hint);
+        return true;
+      });
+
+    this.homey.flow.getActionCard('open_link')
+      .registerRunListener(async ({ link }) => this.openLink(link));
+
+    this.homey.flow.getActionCard('wake')
+      .registerRunListener(async () => this.wake());
+  }
+
+  // -------------------------------------------------------------------
   // Where the television is, and who we are to it
   // -------------------------------------------------------------------
 
@@ -58,6 +123,11 @@ class TvRemoteApp extends Homey.App {
     const ip = this.homey.settings.get('tvIp');
     if (!ip) throw new Error('Geen IP-adres van de tv ingesteld');
     return ip;
+  }
+
+  /** The address if there is one, without complaining when there is not. */
+  knownHost() {
+    return this.homey.settings.get('tvIp') || null;
   }
 
   setHost(ip) {

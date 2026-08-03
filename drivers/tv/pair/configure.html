@@ -1,0 +1,36 @@
+<div class="wrap">
+  <p class="explain">
+    Geef het IP-adres van je televisie. Ze moet aan staan: op de volgende stap
+    verschijnt er een code op het scherm die je overtikt.
+  </p>
+
+  <fieldset class="homey-form-fieldset">
+    <div class="homey-form-group">
+      <label class="homey-form-label" for="ip">IP-adres</label>
+      <!-- Not inputmode="decimal": that gives a number pad whose only
+           separator is the local one, a comma here, so the dots cannot be
+           typed at all. The url keyboard does have a full stop. -->
+      <input class="homey-form-input" id="ip" type="text" inputmode="url"
+             placeholder="192.168.0.100" autocomplete="off" autocapitalize="off"
+             autocorrect="off" spellcheck="false" oninput="onIp(this.value)" />
+    </div>
+  </fieldset>
+</div>
+
+<script type="application/javascript">
+  Homey.setTitle('Televisie zoeken');
+
+  // Repairing an existing television: start from the address it had.
+  Homey.emit('known_host').then(function (host) {
+    if (host) document.getElementById('ip').value = host;
+  }).catch(function () {});
+
+  function onIp(value) {
+    Homey.emit('set_host', value).catch(function () {});
+  }
+</script>
+
+<style type="text/css">
+  .wrap { padding: 4px; }
+  .explain { opacity: 0.7; line-height: 1.5; margin-bottom: 14px; }
+</style>

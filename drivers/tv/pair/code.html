@@ -1,0 +1,58 @@
+<div class="wrap">
+  <p class="explain" id="explain">Verbinden met de televisie&hellip;</p>
+
+  <fieldset class="homey-form-fieldset">
+    <div class="homey-form-group">
+      <label class="homey-form-label" for="code">Code van het scherm</label>
+      <input class="homey-form-input code" id="code" type="text" maxlength="6"
+             placeholder="ABC123" autocomplete="off" autocapitalize="characters"
+             autocorrect="off" spellcheck="false" disabled />
+    </div>
+  </fieldset>
+
+  <button class="homey-button-primary-full" id="submit" onclick="send()" disabled>
+    Koppelen
+  </button>
+
+  <p class="oops" id="oops"></p>
+</div>
+
+<script type="application/javascript">
+  Homey.setTitle('Code van het scherm');
+
+  var explain = document.getElementById('explain');
+  var oops = document.getElementById('oops');
+  var code = document.getElementById('code');
+  var submit = document.getElementById('submit');
+
+  // Opening this step is what makes the television put a code on screen.
+  Homey.emit('pair_start').then(function () {
+    explain.innerText = 'Op je televisie staat nu een code van zes tekens. '
+      + 'Tik ze hier over.';
+    code.disabled = false;
+    submit.disabled = false;
+    code.focus();
+  }).catch(function (err) {
+    explain.innerText = 'Verbinden lukte niet.';
+    oops.innerText = (err && err.message) || String(err);
+  });
+
+  function send() {
+    oops.innerText = '';
+    submit.disabled = true;
+
+    Homey.emit('pair_code', code.value).then(function () {
+      Homey.showView('list_devices');
+    }).catch(function (err) {
+      oops.innerText = (err && err.message) || String(err);
+      submit.disabled = false;
+    });
+  }
+</script>
+
+<style type="text/css">
+  .wrap { padding: 4px; }
+  .explain { opacity: 0.7; line-height: 1.5; margin-bottom: 14px; }
+  .code { font-size: 22px; letter-spacing: 0.24em; text-align: center; text-transform: uppercase; }
+  .oops { color: #e24a4a; min-height: 20px; margin-top: 10px; }
+</style>

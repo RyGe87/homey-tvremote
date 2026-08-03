@@ -1,0 +1,8 @@
+{
+  "title": { "en": "Press a key", "nl": "Druk op een toets" },
+  "titleFormatted": { "en": "Press [[key]]", "nl": "Druk op [[key]]" },
+  "args": [
+    { "name": "device", "type": "device", "filter": "driver_id=tv" },
+    { "name": "key", "type": "autocomplete", "title": { "en": "Key", "nl": "Toets" } }
+  ]
+}
