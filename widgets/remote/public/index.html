@@ -6,6 +6,11 @@
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+    /* The document itself must never scroll: everything that needs to move
+       has its own scroll container. Otherwise a drag on the touchpad takes
+       the whole widget along. */
+    html, body { height: 100%; overflow: hidden; }
+
     body {
       margin: 0;
       padding: 10px;
@@ -13,9 +18,11 @@
       color: var(--homey-text-color, #14161c);
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       height: 100vh;
       user-select: none;
+      /* Keep a gesture that starts here from bleeding into the dashboard. */
+      overscroll-behavior: none;
     }
 
     .row { display: flex; gap: 8px; }
@@ -37,15 +44,54 @@
       color: #fff;
       transform: scale(0.96);
     }
+    button:disabled { opacity: 0.5; }
 
     .power { background: var(--homey-color-red-100, rgba(226, 74, 74, 0.16)); font-size: 18px; }
     .power.on { background: var(--homey-color-green-100, rgba(46, 173, 110, 0.2)); }
+
+    /* Waking is the emergency route, so it stands apart from the normal keys. */
+    .wake { background: var(--homey-color-yellow-100, rgba(233, 168, 46, 0.22)); font-size: 17px; }
+    .wake.busy { animation: knock 1s ease-in-out infinite; }
+    @keyframes knock { 50% { opacity: 0.45; } }
+
+    /* Two screens side by side; swipe anywhere outside the touchpad. */
+    .screens {
+      flex: 1;
+      display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+      overscroll-behavior: contain;
+      gap: 10px;
+      min-height: 0;
+    }
+    .screens::-webkit-scrollbar { display: none; }
+    .screen {
+      min-width: 100%;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .tabs { display: flex; gap: 6px; justify-content: center; }
+    .tab {
+      font-size: 12px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      opacity: 0.45;
+      background: var(--homey-color-mono-100, rgba(127, 137, 160, 0.16));
+      cursor: pointer;
+    }
+    .tab.active { opacity: 1; background: var(--homey-color-blue-500, #1f7aec); color: #fff; }
 
     /* Touchpad */
     .pad {
       position: relative;
       flex: 1;
-      min-height: 150px;
+      min-height: 130px;
       border-radius: 18px;
       background: var(--homey-color-mono-050, rgba(127, 137, 160, 0.1));
       border: 1px solid var(--homey-color-mono-100, rgba(127, 137, 160, 0.18));
@@ -80,6 +126,49 @@
       opacity: 0.22;
     }
 
+    input[type="search"] {
+      font: inherit;
+      font-size: 16px;
+      color: inherit;
+      width: 100%;
+      padding: 13px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--homey-color-mono-100, rgba(127, 137, 160, 0.25));
+      background: var(--homey-color-mono-050, rgba(127, 137, 160, 0.1));
+      -webkit-appearance: none;
+    }
+
+    .explain { font-size: 12px; opacity: 0.55; line-height: 1.45; margin: 2px 0; }
+
+    /* Deliberately not a theme variable: on the dashboard that resolved to
+       near-white, leaving the label unreadable until the button was held. */
+    .primary { background: rgba(31, 122, 236, 0.22); font-weight: 600; }
+
+    .pairbox {
+      border-top: 1px solid var(--homey-color-mono-100, rgba(127, 137, 160, 0.2));
+      padding-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #paircode {
+      font: inherit;
+      font-size: 16px;
+      letter-spacing: 0.18em;
+      text-align: center;
+      text-transform: uppercase;
+      color: inherit;
+      padding: 12px 8px;
+      border-radius: 12px;
+      border: 1px solid var(--homey-color-mono-100, rgba(127, 137, 160, 0.25));
+      background: var(--homey-color-mono-050, rgba(127, 137, 160, 0.1));
+      -webkit-appearance: none;
+      min-width: 0;
+    }
+
+    /* The search screen can outgrow the widget once pairing is shown. */
+    .screen.scrolls { overflow-y: auto; }
+
     .status {
       font-size: 12px;
       text-align: center;
@@ -90,39 +179,101 @@
   </style>
 </head>
 <body>
-  <div class="row">
-    <button class="power" id="power" title="Aan/uit">&#9211;</button>
-    <button data-button="mute" title="Dempen">&#128263;</button>
-    <button data-button="volume_down" title="Zachter">&#8722;</button>
-    <button data-button="volume_up" title="Harder">&#43;</button>
+  <div class="tabs">
+    <div class="tab active" data-screen="0">Bediening</div>
+    <div class="tab" data-screen="1">Zoeken</div>
   </div>
 
-  <div class="pad" id="pad">
-    <span class="hint up">&#9650;</span>
-    <span class="hint down">&#9660;</span>
-    <span class="hint left">&#9664;</span>
-    <span class="hint right">&#9654;</span>
-    <span class="ok">OK</span>
-  </div>
+  <div class="screens" id="screens">
 
-  <div class="row">
-    <button data-button="back">Terug</button>
-    <button data-button="exit">Exit</button>
-    <button data-button="info">&#8505;</button>
-  </div>
+    <section class="screen">
+      <div class="row">
+        <button class="power" id="power" title="Aan/uit">&#9211;</button>
+        <button data-button="mute" title="Dempen">&#128263;</button>
+        <button class="wake" id="wake" title="Wekken met een magic packet">&#9889;</button>
+        <button data-button="volume_down" title="Zachter">&#8722;</button>
+        <button data-button="volume_up" title="Harder">&#43;</button>
+      </div>
 
-  <div class="row">
-    <button data-button="previous">&#9198; Vorige</button>
-    <button data-button="next">Volgende &#9197;</button>
+      <div class="pad" id="pad">
+        <span class="hint up">&#9650;</span>
+        <span class="hint down">&#9660;</span>
+        <span class="hint left">&#9664;</span>
+        <span class="hint right">&#9654;</span>
+        <span class="ok">OK</span>
+      </div>
+
+      <div class="row">
+        <button data-button="back">Terug</button>
+        <button data-button="exit">Exit</button>
+        <button data-button="info">&#8505;</button>
+      </div>
+
+      <div class="row">
+        <button data-button="previous">&#9198; Vorig filmpje</button>
+        <button data-button="next">Volgend filmpje &#9197;</button>
+      </div>
+    </section>
+
+    <section class="screen scrolls">
+      <input type="search" id="term" placeholder="Zoekterm typen&hellip;"
+             autocomplete="off" autocorrect="off" spellcheck="false"
+             enterkeyhint="search">
+      <div class="row">
+        <button data-search="youtube">YouTube</button>
+        <button data-search="netflix">Netflix</button>
+      </div>
+      <div class="row">
+        <button id="sendtext" class="primary">&#9998; Stuur naar het veld op de tv</button>
+      </div>
+
+      <div class="pairbox">
+        <div class="row">
+          <!-- Not inputmode="decimal": that yields a number pad whose only
+               separator is the locale one, a comma here, so the dots cannot
+               be typed at all. The url keyboard does have a full stop. -->
+          <input type="text" id="pairip" placeholder="192.168.0.100"
+                 inputmode="url" autocomplete="off" autocapitalize="off"
+                 autocorrect="off" spellcheck="false">
+          <button id="hostsave">Adres bewaren</button>
+        </div>
+
+        <div id="pairbox" hidden>
+          <p class="explain">
+            Deze widget praat rechtstreeks met de tv. Koppel één keer: vul het
+            IP-adres in en typ daarna de code over die op het scherm verschijnt.
+          </p>
+          <div class="row">
+            <button id="pairstart">Koppelen met de tv</button>
+          </div>
+          <div class="row" id="pairconfirm" hidden>
+            <input type="text" id="paircode" placeholder="Code van het scherm"
+                   inputmode="latin" autocapitalize="characters" maxlength="6">
+            <button id="pairsend">Bevestig</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="explain">
+        De bovenste twee knoppen openen zoekresultaten rechtstreeks. Staat er een
+        zoekveld open op de tv, dan zet de knop daaronder je hele term er in
+        één keer in.
+      </p>
+    </section>
+
   </div>
 
   <div class="status" id="status"></div>
 
   <script>
-    // Swiping further than this fires one cursor step; a shorter gesture is a tap.
-    const STEP = 26;
+    // A swipe must travel this far before it counts as one cursor step, and
+    // steps cannot follow each other faster than this. Both together keep a
+    // list from shooting to the bottom on one flick of the thumb.
+    const STEP = 58;
+    const MIN_INTERVAL_MS = 220;
 
     let homey = null;
+    let statusTimer = null;
     const statusEl = document.getElementById('status');
 
     function say(message, isError) {
@@ -159,12 +310,12 @@
       document.getElementById('power').addEventListener('click', () => press('power'));
     }
 
-    /** Touchpad: a short tap confirms, dragging steps through the menu. A long
-     *  drag keeps stepping, so holding and moving scrolls a list naturally. */
+    /** Touchpad: a short tap confirms, dragging steps through the menu. */
     function wirePad() {
       const pad = document.getElementById('pad');
       let originX = 0;
       let originY = 0;
+      let lastStep = 0;
       let moved = false;
 
       const pulse = () => {
@@ -172,10 +323,17 @@
         setTimeout(() => pad.classList.remove('pulse'), 110);
       };
 
+      // touch-action alone does not stop the dashboard from scrolling under
+      // the finger, so swallow the gesture outright. Without this, dragging
+      // on the pad drags the whole page and a sideways swipe flips the tab.
+      pad.addEventListener('touchstart', event => event.preventDefault(), { passive: false });
+      pad.addEventListener('touchmove', event => event.preventDefault(), { passive: false });
+
       pad.addEventListener('pointerdown', event => {
         pad.setPointerCapture(event.pointerId);
         originX = event.clientX;
         originY = event.clientY;
+        lastStep = 0;
         moved = false;
       });
 
@@ -183,14 +341,17 @@
         const dx = event.clientX - originX;
         const dy = event.clientY - originY;
         if (Math.abs(dx) < STEP && Math.abs(dy) < STEP) return;
+        if (Date.now() - lastStep < MIN_INTERVAL_MS) return;
 
         if (Math.abs(dx) > Math.abs(dy)) {
           press(dx > 0 ? 'right' : 'left');
-          originX = event.clientX;
         } else {
           press(dy > 0 ? 'down' : 'up');
-          originY = event.clientY;
         }
+        // Reset both axes so a diagonal drag cannot bank up a second step.
+        originX = event.clientX;
+        originY = event.clientY;
+        lastStep = Date.now();
         moved = true;
         pulse();
       });
@@ -203,10 +364,191 @@
       });
     }
 
+    /** Tabs and swiping are two ways to the same two screens. */
+    function wireScreens() {
+      const screens = document.getElementById('screens');
+      const tabs = [...document.querySelectorAll('.tab')];
+
+      tabs.forEach(tab => tab.addEventListener('click', () => {
+        screens.scrollTo({ left: screens.clientWidth * Number(tab.dataset.screen), behavior: 'smooth' });
+      }));
+
+      screens.addEventListener('scroll', () => {
+        const index = Math.round(screens.scrollLeft / Math.max(screens.clientWidth, 1));
+        tabs.forEach((tab, i) => tab.classList.toggle('active', i === index));
+      }, { passive: true });
+    }
+
+    function wireSearch() {
+      const term = document.getElementById('term');
+
+      const go = async service => {
+        if (!term.value.trim()) {
+          say('Typ eerst een zoekterm', true);
+          return;
+        }
+        say('Zoeken op de tv…');
+        try {
+          await homey.api('POST', '/search', { service, term: term.value });
+          say('Gestuurd naar de tv');
+          term.blur();
+        } catch (err) {
+          say(err && err.message ? err.message : 'Zoeken lukte niet', true);
+        }
+      };
+
+      document.querySelectorAll('[data-search]').forEach(el => {
+        el.addEventListener('click', () => {
+          flash(el);
+          go(el.dataset.search);
+        });
+      });
+
+      term.addEventListener('keydown', event => {
+        if (event.key === 'Enter') go('youtube');
+      });
+
+    }
+
+    /** Real text input needs its own pairing, so the offer only appears
+     *  while that has not happened yet. */
+    /** Only the pairing offer is hidden once paired. The send button stays
+     *  enabled on purpose: a disabled button swallows the tap and then
+     *  nothing at all happens, which looks like a broken widget instead of
+     *  an explainable error. */
+    function showPairing(paired) {
+      document.getElementById('pairbox').hidden = Boolean(paired);
+    }
+
+    function wireText() {
+      const term = document.getElementById('term');
+      const button = document.getElementById('sendtext');
+
+      button.addEventListener('click', async () => {
+        if (!term.value.trim()) {
+          say('Typ eerst een zoekterm', true);
+          return;
+        }
+        flash(button);
+        button.disabled = true;
+        say('Versturen…');
+        try {
+          const result = await homey.api('POST', '/text', { term: term.value });
+          if (result && result.ok) say(`In het veld staat nu: ${result.field}`);
+          else say((result && result.hint) || 'De tv nam de tekst niet aan', true);
+        } catch (err) {
+          say(err && err.message ? err.message : 'Versturen lukte niet', true);
+        }
+        button.disabled = false;
+      });
+    }
+
+    function wirePairing() {
+      const save = document.getElementById('hostsave');
+      save.addEventListener('click', async () => {
+        flash(save);
+        try {
+          const result = await homey.api('POST', '/host', { ip: document.getElementById('pairip').value });
+          say(`Adres bewaard: ${result.ip}`);
+        } catch (err) {
+          say(err && err.message ? err.message : 'Adres bewaren lukte niet', true);
+        }
+      });
+
+      const start = document.getElementById('pairstart');
+      const confirm = document.getElementById('pairconfirm');
+      const code = document.getElementById('paircode');
+      const send = document.getElementById('pairsend');
+
+      start.addEventListener('click', async () => {
+        flash(start);
+        start.disabled = true;
+        say('Verbinden met de tv…');
+        try {
+          await homey.api('POST', '/pair/start', { ip: document.getElementById('pairip').value });
+          confirm.hidden = false;
+          code.focus();
+          say('Typ de code die nu op je tv staat');
+        } catch (err) {
+          say(err && err.message ? err.message : 'Koppelen lukte niet', true);
+        }
+        start.disabled = false;
+      });
+
+      send.addEventListener('click', async () => {
+        flash(send);
+        send.disabled = true;
+        say('Code controleren…');
+        try {
+          await homey.api('POST', '/pair/code', { code: code.value });
+          confirm.hidden = true;
+          showPairing(true);
+          say('Gekoppeld — tekst versturen kan nu');
+        } catch (err) {
+          say(err && err.message ? err.message : 'De code werd niet aanvaard', true);
+        }
+        send.disabled = false;
+      });
+    }
+
+
+    /** Waking runs in the app and can take a minute and a half, so the
+     *  button starts it and the status line follows along. */
+    function wireWake() {
+      const wake = document.getElementById('wake');
+
+      wake.addEventListener('click', async () => {
+        flash(wake);
+        wake.classList.add('busy');
+        wake.disabled = true;
+        say('Wekken… dit duurt tot anderhalve minuut');
+        try {
+          await homey.api('POST', '/wake', {});
+          followWake();
+        } catch (err) {
+          wake.classList.remove('busy');
+          wake.disabled = false;
+          say(err && err.message ? err.message : 'Wekken lukte niet', true);
+        }
+      });
+    }
+
+    function followWake() {
+      const wake = document.getElementById('wake');
+      clearInterval(statusTimer);
+
+      statusTimer = setInterval(async () => {
+        try {
+          const result = await homey.api('GET', '/status', {});
+          if (result && result.waking) {
+            say('Wekken… de tv reageert nog niet');
+            return;
+          }
+          clearInterval(statusTimer);
+          wake.classList.remove('busy');
+          wake.disabled = false;
+          markPower(Boolean(result && result.on));
+
+          if (result && result.wakeResult && result.wakeResult.ok) {
+            say('De tv is wakker');
+          } else if (result && result.wakeResult) {
+            say(result.wakeResult.error || 'De tv reageerde niet', true);
+          }
+        } catch (err) {
+          // Keep polling; a hiccup while the television boots is expected.
+        }
+      }, 3000);
+    }
+
     function onHomeyReady(Homey) {
       homey = Homey;
       wireButtons();
       wirePad();
+      wireScreens();
+      wireSearch();
+      wireText();
+      wirePairing();
+      wireWake();
       Homey.ready();
 
       Homey.api('GET', '/status', {})
@@ -216,7 +558,11 @@
             return;
           }
           markPower(result.on);
-          if (!result.available) say(result.name + ' is niet bereikbaar');
+          showPairing(result.paired);
+          if (result.host) document.getElementById('pairip').value = result.host;
+          if (result.waking) followWake();
+          else if (!result.paired) say('Nog niet gekoppeld — zie het zoekscherm');
+          else if (!result.available) say('De tv is niet bereikbaar (slaapt hij?)');
         })
         .catch(() => say('Kon de status niet ophalen', true));
     }

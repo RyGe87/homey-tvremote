@@ -1,0 +1,72 @@
+TV Remote Widget for Homey
+Copyright (c) 2026 Geert Rymenants
+
+This product is licensed under the MIT License (see LICENSE).
+
+It redistributes two protocol schema files that were written by others. Their
+terms are reproduced here because MIT does not override them.
+
+--------------------------------------------------------------------------------
+lib/androidtv/remotemessage.proto
+--------------------------------------------------------------------------------
+Taken from tronikos/androidtvremote2, licensed under the Apache License,
+Version 2.0. https://github.com/tronikos/androidtvremote2
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this file except in compliance with the License. You may obtain a copy of
+  the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+  License for the specific language governing permissions and limitations under
+  the License.
+
+Change made: a header comment recording its origin. The schema is unmodified.
+
+That project notes in turn that the schema began as a copy of the file in
+louis49/androidtv-remote (MIT), extended with comments taken from the Android
+Open Source Project's include/android/keycodes.h (Apache License 2.0).
+
+--------------------------------------------------------------------------------
+lib/androidtv/pairingmessage.proto
+--------------------------------------------------------------------------------
+Taken unchanged from louis49/androidtv-remote, licensed under the MIT License.
+Copyright (c) 2021 louis49. https://github.com/louis49/androidtv-remote
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+--------------------------------------------------------------------------------
+Dependencies fetched from npm
+--------------------------------------------------------------------------------
+These are not part of this repository (node_modules is not committed), but they
+are bundled into the app package that is installed on a Homey.
+
+  node-forge 1.x   Digital Bazaar, Inc. — dual licensed BSD-3-Clause OR
+                   GPL-2.0. Used here under the BSD-3-Clause option, which the
+                   project itself recommends.
+  protobufjs 8.x   Copyright (c) 2016 Daniel Wirtz — BSD-3-Clause. Its google/
+                   directory carries a separate BSD-3-Clause notice,
+                   Copyright 2014 Google Inc.
+  long 5.x         Apache License 2.0.
+
+The `homey` module is provided by the Homey firmware itself; it is neither
+declared as a dependency nor redistributed here.

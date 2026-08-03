@@ -1,6 +1,6 @@
 {
   "id": "dev.rymenants.tvremote",
-  "version": "1.0.0",
+  "version": "1.7.0",
   "compatibility": ">=12.3.0",
   "sdk": 3,
   "platforms": [
@@ -18,9 +18,6 @@
     "tools"
   ],
   "brandColor": "#3b3f52",
-  "permissions": [
-    "homey:manager:api"
-  ],
   "images": {
     "small": "/assets/images/small.png",
     "large": "/assets/images/large.png",
@@ -28,6 +25,6 @@
   },
   "author": {
     "name": "Geert Rymenants",
-    "email": "rymenants.geert@me.com"
+    "email": "geert@rymenants.dev"
   }
 }

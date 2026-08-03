@@ -3,7 +3,7 @@
     "en": "TV remote",
     "nl": "Afstandsbediening"
   },
-  "height": 460,
+  "height": 560,
   "settings": [],
   "api": {
     "press": {
@@ -13,6 +13,30 @@
     "status": {
       "method": "GET",
       "path": "/status"
+    },
+    "search": {
+      "method": "POST",
+      "path": "/search"
+    },
+    "text": {
+      "method": "POST",
+      "path": "/text"
+    },
+    "pairStart": {
+      "method": "POST",
+      "path": "/pair/start"
+    },
+    "pairCode": {
+      "method": "POST",
+      "path": "/pair/code"
+    },
+    "setHost": {
+      "method": "POST",
+      "path": "/host"
+    },
+    "wake": {
+      "method": "POST",
+      "path": "/wake"
     }
   }
 }
