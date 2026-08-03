@@ -101,6 +101,11 @@
       overflow: hidden;
     }
     .pad .ok {
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      position: relative;
+      transition: background 0.12s ease;
       font-size: 17px;
       font-weight: 600;
       letter-spacing: 0.06em;
@@ -109,8 +114,8 @@
     }
     .pad .hint {
       position: absolute;
-      font-size: 15px;
-      opacity: 0.3;
+      font-size: 17px;
+      opacity: 0.45;
       pointer-events: none;
     }
     .hint.up { top: 8px; }
@@ -118,12 +123,26 @@
     .hint.left { left: 12px; }
     .hint.right { right: 12px; }
 
-    .pad.pulse::after {
-      content: "";
+    /* The diagonals carve the pad into four triangles. They are invisible
+       until one is hit, so the pad shows exactly what it understood. */
+    .zone {
       position: absolute;
       inset: 0;
       background: var(--homey-color-blue-500, #1f7aec);
-      opacity: 0.22;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.12s ease;
+    }
+    .zone.up { clip-path: polygon(0 0, 100% 0, 50% 50%); }
+    .zone.right { clip-path: polygon(100% 0, 100% 100%, 50% 50%); }
+    .zone.down { clip-path: polygon(100% 100%, 0 100%, 50% 50%); }
+    .zone.left { clip-path: polygon(0 100%, 0 0, 50% 50%); }
+    .zone.lit { opacity: 0.3; }
+
+    .pad .ok.lit {
+      background: var(--homey-color-blue-500, #1f7aec);
+      color: #fff;
+      opacity: 1;
     }
 
     input[type="search"] {
@@ -175,6 +194,10 @@
       </div>
 
       <div class="pad" id="pad">
+        <span class="zone up"></span>
+        <span class="zone right"></span>
+        <span class="zone down"></span>
+        <span class="zone left"></span>
         <span class="hint up">&#9650;</span>
         <span class="hint down">&#9660;</span>
         <span class="hint left">&#9664;</span>
@@ -270,10 +293,13 @@
       let originY = 0;
       let lastStep = 0;
       let moved = false;
+      let okRadius = 40;
 
-      const pulse = () => {
-        pad.classList.add('pulse');
-        setTimeout(() => pad.classList.remove('pulse'), 110);
+      const flashZone = name => {
+        const zone = pad.querySelector(name === 'ok' ? '.ok' : `.zone.${name}`);
+        if (!zone) return;
+        zone.classList.add('lit');
+        setTimeout(() => zone.classList.remove('lit'), 130);
       };
 
       // touch-action alone does not stop the dashboard from scrolling under
@@ -296,25 +322,58 @@
         if (Math.abs(dx) < STEP && Math.abs(dy) < STEP) return;
         if (Date.now() - lastStep < MIN_INTERVAL_MS) return;
 
-        if (Math.abs(dx) > Math.abs(dy)) {
-          press(dx > 0 ? 'right' : 'left');
-        } else {
-          press(dy > 0 ? 'down' : 'up');
-        }
+        const direction = Math.abs(dx) > Math.abs(dy)
+          ? (dx > 0 ? 'right' : 'left')
+          : (dy > 0 ? 'down' : 'up');
+        press(direction);
         // Reset both axes so a diagonal drag cannot bank up a second step.
         originX = event.clientX;
         originY = event.clientY;
         lastStep = Date.now();
         moved = true;
-        pulse();
+        flashZone(direction);
       });
 
-      pad.addEventListener('pointerup', () => {
-        if (!moved) {
-          press('ok');
-          pulse();
-        }
+      // A tap is read by where it landed: the circle in the middle confirms,
+      // everything outside steps in the direction it points. The arrows are
+      // labels for those zones, not decoration.
+      pad.addEventListener('pointerup', event => {
+        if (moved) return;
+
+        const rect = pad.getBoundingClientRect();
+        const dx = event.clientX - (rect.left + rect.width / 2);
+        const dy = event.clientY - (rect.top + rect.height / 2);
+
+        const hit = Math.hypot(dx, dy) <= okRadius
+          ? 'ok'
+          : (Math.abs(dx) > Math.abs(dy)
+            ? (dx > 0 ? 'right' : 'left')
+            : (dy > 0 ? 'down' : 'up'));
+
+        press(hit === 'ok' ? 'ok' : hit);
+        flashZone(hit);
       });
+
+      // The visible circle IS the tap zone, so it is measured, never guessed.
+      const okEl = pad.querySelector('.ok');
+      const zones = [...pad.querySelectorAll('.zone')];
+      const sizeOk = () => {
+        const rect = pad.getBoundingClientRect();
+        okRadius = Math.max(34, Math.min(rect.width, rect.height) * 0.26);
+        okEl.style.width = `${okRadius * 2}px`;
+        okEl.style.height = `${okRadius * 2}px`;
+
+        // Punch the circle out of the triangles, using the very radius just
+        // measured. Their tips would otherwise shine through the ring, which
+        // lights up the middle while the middle was not what was pressed.
+        const hole = `radial-gradient(circle at center, transparent 0 ${okRadius + 1}px, #000 ${okRadius + 1}px)`;
+        zones.forEach(zone => {
+          zone.style.webkitMaskImage = hole;
+          zone.style.maskImage = hole;
+        });
+      };
+      sizeOk();
+      window.addEventListener('resize', sizeOk);
     }
 
     /** Tabs and swiping are two ways to the same two screens. */
