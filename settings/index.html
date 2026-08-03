@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <title>Afstandsbediening</title>
+
+  <!-- Opened from the iOS home screen this runs full screen, without any
+       browser furniture, and keeps clear of the notch. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Tv">
+  <meta name="theme-color" content="#14161c">
+  <link rel="apple-touch-icon" href="icon.png">
+
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+
+    body {
+      margin: 0;
+      padding: max(10px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #14161c;
+      color: #eef1f6;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      user-select: none;
+    }
+
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+
+    button {
+      font: inherit;
+      font-size: 16px;
+      color: inherit;
+      border: none;
+      border-radius: 14px;
+      padding: 15px 6px;
+      background: rgba(127, 137, 160, 0.18);
+      cursor: pointer;
+      transition: transform 0.06s ease, background 0.15s ease;
+    }
+    button:active, button.flash {
+      background: #1f7aec;
+      color: #fff;
+      transform: scale(0.96);
+    }
+
+    .power { background: rgba(226, 74, 74, 0.22); font-size: 19px; }
+    .power.on { background: rgba(46, 173, 110, 0.26); }
+    .wake { background: rgba(233, 168, 46, 0.24); font-size: 18px; }
+    .wake.busy { animation: knock 1s ease-in-out infinite; }
+    @keyframes knock { 50% { opacity: 0.45; } }
+    .primary { background: rgba(31, 122, 236, 0.28); font-weight: 600; }
+
+    .tabs { display: flex; gap: 8px; justify-content: center; }
+    .tab {
+      font-size: 13px;
+      padding: 6px 16px;
+      border-radius: 999px;
+      opacity: 0.45;
+      background: rgba(127, 137, 160, 0.18);
+      cursor: pointer;
+    }
+    .tab.active { opacity: 1; background: #1f7aec; }
+
+    .screens {
+      flex: 1;
+      display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
+      gap: 12px;
+      min-height: 0;
+    }
+    .screens::-webkit-scrollbar { display: none; }
+    .screen {
+      min-width: 100%;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .pad {
+      position: relative;
+      flex: 1;
+      min-height: 180px;
+      border-radius: 22px;
+      background: rgba(127, 137, 160, 0.1);
+      border: 1px solid rgba(127, 137, 160, 0.2);
+      display: grid;
+      place-items: center;
+      touch-action: none;
+      overflow: hidden;
+    }
+    .pad .ok { font-size: 19px; font-weight: 600; letter-spacing: 0.06em; opacity: 0.7; pointer-events: none; }
+    .pad .hint { position: absolute; font-size: 17px; opacity: 0.28; pointer-events: none; }
+    .hint.up { top: 10px; } .hint.down { bottom: 10px; }
+    .hint.left { left: 14px; } .hint.right { right: 14px; }
+    .pad.pulse::after { content: ""; position: absolute; inset: 0; background: #1f7aec; opacity: 0.22; }
+
+    input[type="search"] {
+      font: inherit;
+      font-size: 16px;
+      color: inherit;
+      width: 100%;
+      padding: 14px 15px;
+      border-radius: 14px;
+      border: 1px solid rgba(127, 137, 160, 0.28);
+      background: rgba(127, 137, 160, 0.12);
+      -webkit-appearance: none;
+    }
+
+    .explain { font-size: 12px; opacity: 0.5; line-height: 1.5; margin: 2px 0; }
+    .status { font-size: 12px; text-align: center; opacity: 0.6; min-height: 16px; }
+    .status.error { color: #ff8a8a; opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="tabs">
+    <div class="tab active" data-screen="0">Bediening</div>
+    <div class="tab" data-screen="1">Zoeken</div>
+  </div>
+
+  <div class="screens" id="screens">
+
+    <section class="screen">
+      <div class="row">
+        <button class="power" id="power" title="Aan/uit">&#9211;</button>
+        <button data-button="mute">&#128263;</button>
+        <button class="wake" id="wake" title="Wekken">&#9889;</button>
+        <button data-button="volume_down">&#8722;</button>
+        <button data-button="volume_up">&#43;</button>
+      </div>
+
+      <div class="pad" id="pad">
+        <span class="hint up">&#9650;</span>
+        <span class="hint down">&#9660;</span>
+        <span class="hint left">&#9664;</span>
+        <span class="hint right">&#9654;</span>
+        <span class="ok">OK</span>
+      </div>
+
+      <div class="row">
+        <button data-button="back">Terug</button>
+        <button data-button="exit">Exit</button>
+        <button data-button="info">&#8505;</button>
+      </div>
+
+      <div class="row">
+        <button data-button="previous">&#9198; Vorig</button>
+        <button data-button="next">Volgend &#9197;</button>
+      </div>
+    </section>
+
+    <section class="screen">
+      <input type="search" id="term" placeholder="Zoekterm typen&hellip;"
+             autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+      <div class="row">
+        <button data-search="youtube">YouTube</button>
+        <button data-search="netflix">Netflix</button>
+      </div>
+      <div class="row">
+        <button id="sendtext" class="primary">&#9998; Stuur naar het veld op de tv</button>
+      </div>
+      <p class="explain">
+        De bovenste twee knoppen openen zoekresultaten rechtstreeks. Staat er een
+        zoekveld open op de tv, dan zet de knop daaronder je hele term er in één keer in.
+      </p>
+    </section>
+
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <script>
+    // Served by the Homey itself, so the API sits on this very origin: no
+    // token to carry, no cross-origin trouble.
+    const API = '/api/app/dev.rymenants.tvremote';
+
+    // A swipe travels this far before it counts as one step, and steps cannot
+    // follow each other faster than this.
+    const STEP = 58;
+    const MIN_INTERVAL_MS = 220;
+
+    const statusEl = document.getElementById('status');
+    let statusTimer = null;
+
+    function say(message, isError) {
+      statusEl.textContent = message || '';
+      statusEl.classList.toggle('error', Boolean(isError));
+    }
+
+    async function call(path, body) {
+      const response = await fetch(API + path, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!response.ok) {
+        throw new Error((data && (data.error || data.message)) || `Fout ${response.status}`);
+      }
+      // Homey wraps a successful answer in { result: … }.
+      return data && Object.prototype.hasOwnProperty.call(data, 'result') ? data.result : data;
+    }
+
+    function flash(el) {
+      el.classList.add('flash');
+      setTimeout(() => el.classList.remove('flash'), 120);
+    }
+
+    function markPower(on) {
+      document.getElementById('power').classList.toggle('on', Boolean(on));
+    }
+
+    async function press(button) {
+      try {
+        const result = await call('/press', { button });
+        if (result && typeof result.on === 'boolean') markPower(result.on);
+        say('');
+      } catch (err) {
+        say(err.message || 'Kon de opdracht niet versturen', true);
+      }
+    }
+
+    function wireButtons() {
+      document.querySelectorAll('[data-button]').forEach(el => {
+        el.addEventListener('click', () => { flash(el); press(el.dataset.button); });
+      });
+      document.getElementById('power').addEventListener('click', () => press('power'));
+    }
+
+    function wirePad() {
+      const pad = document.getElementById('pad');
+      let originX = 0;
+      let originY = 0;
+      let lastStep = 0;
+      let moved = false;
+
+      const pulse = () => {
+        pad.classList.add('pulse');
+        setTimeout(() => pad.classList.remove('pulse'), 110);
+      };
+
+      // Swallow the gesture outright, or the page travels with the finger.
+      pad.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+      pad.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+      pad.addEventListener('pointerdown', event => {
+        pad.setPointerCapture(event.pointerId);
+        originX = event.clientX;
+        originY = event.clientY;
+        lastStep = 0;
+        moved = false;
+      });
+
+      pad.addEventListener('pointermove', event => {
+        const dx = event.clientX - originX;
+        const dy = event.clientY - originY;
+        if (Math.abs(dx) < STEP && Math.abs(dy) < STEP) return;
+        if (Date.now() - lastStep < MIN_INTERVAL_MS) return;
+
+        if (Math.abs(dx) > Math.abs(dy)) press(dx > 0 ? 'right' : 'left');
+        else press(dy > 0 ? 'down' : 'up');
+
+        originX = event.clientX;
+        originY = event.clientY;
+        lastStep = Date.now();
+        moved = true;
+        pulse();
+      });
+
+      pad.addEventListener('pointerup', () => {
+        if (!moved) { press('ok'); pulse(); }
+      });
+    }
+
+    function wireScreens() {
+      const screens = document.getElementById('screens');
+      const tabs = [...document.querySelectorAll('.tab')];
+
+      tabs.forEach(tab => tab.addEventListener('click', () => {
+        screens.scrollTo({ left: screens.clientWidth * Number(tab.dataset.screen), behavior: 'smooth' });
+      }));
+
+      screens.addEventListener('scroll', () => {
+        const index = Math.round(screens.scrollLeft / Math.max(screens.clientWidth, 1));
+        tabs.forEach((tab, i) => tab.classList.toggle('active', i === index));
+      }, { passive: true });
+    }
+
+    function wireSearch() {
+      const term = document.getElementById('term');
+
+      const go = async service => {
+        if (!term.value.trim()) { say('Typ eerst een zoekterm', true); return; }
+        say('Zoeken op de tv…');
+        try {
+          await call('/search', { service, term: term.value });
+          say('Gestuurd naar de tv');
+          term.blur();
+        } catch (err) {
+          say(err.message || 'Zoeken lukte niet', true);
+        }
+      };
+
+      document.querySelectorAll('[data-search]').forEach(el => {
+        el.addEventListener('click', () => { flash(el); go(el.dataset.search); });
+      });
+      term.addEventListener('keydown', e => { if (e.key === 'Enter') go('youtube'); });
+
+      const send = document.getElementById('sendtext');
+      send.addEventListener('click', async () => {
+        if (!term.value.trim()) { say('Typ eerst een zoekterm', true); return; }
+        flash(send);
+        send.disabled = true;
+        say('Versturen…');
+        try {
+          const result = await call('/text', { term: term.value });
+          if (result && result.ok) say(`In het veld staat nu: ${result.field}`);
+          else say((result && result.hint) || 'De tv nam de tekst niet aan', true);
+        } catch (err) {
+          say(err.message || 'Versturen lukte niet', true);
+        }
+        send.disabled = false;
+      });
+    }
+
+    function wireWake() {
+      const wake = document.getElementById('wake');
+
+      wake.addEventListener('click', async () => {
+        flash(wake);
+        wake.classList.add('busy');
+        wake.disabled = true;
+        say('Wekken… dit duurt tot anderhalve minuut');
+        try {
+          await call('/wake', {});
+          followWake();
+        } catch (err) {
+          wake.classList.remove('busy');
+          wake.disabled = false;
+          say(err.message || 'Wekken lukte niet', true);
+        }
+      });
+    }
+
+    function followWake() {
+      const wake = document.getElementById('wake');
+      clearInterval(statusTimer);
+
+      statusTimer = setInterval(async () => {
+        try {
+          const result = await call('/status');
+          if (result && result.waking) { say('Wekken… de tv reageert nog niet'); return; }
+          clearInterval(statusTimer);
+          wake.classList.remove('busy');
+          wake.disabled = false;
+          markPower(Boolean(result && result.on));
+          if (result && result.wakeResult && result.wakeResult.ok) say('De tv is wakker');
+          else if (result && result.wakeResult) say(result.wakeResult.error || 'De tv reageerde niet', true);
+        } catch (err) {
+          // Keep polling; a hiccup while the television boots is expected.
+        }
+      }, 3000);
+    }
+
+    wireButtons();
+    wirePad();
+    wireScreens();
+    wireSearch();
+    wireWake();
+
+    call('/status')
+      .then(result => {
+        markPower(result && result.on);
+        if (result && result.waking) followWake();
+        else if (result && !result.paired) say('Nog niet gekoppeld: voeg de tv toe als apparaat', true);
+        else if (result && !result.available) say('De tv is niet bereikbaar (slaapt hij?)');
+      })
+      .catch(err => say(err.message || 'Kon de status niet ophalen', true));
+  </script>
+</body>
+</html>

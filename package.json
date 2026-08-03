@@ -1,6 +1,6 @@
 {
   "name": "dev.rymenants.tvremote",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "main": "app.js",
   "license": "MIT",
   "description": "Homey dashboard widget with a usable TV remote layout",

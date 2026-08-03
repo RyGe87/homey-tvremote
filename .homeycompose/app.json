@@ -1,6 +1,6 @@
 {
   "id": "dev.rymenants.tvremote",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "compatibility": ">=12.3.0",
   "sdk": 3,
   "platforms": [
@@ -26,5 +26,32 @@
   "author": {
     "name": "Geert Rymenants",
     "email": "geert@rymenants.dev"
+  },
+  "api": {
+    "status": {
+      "method": "GET",
+      "path": "/status",
+      "public": true
+    },
+    "press": {
+      "method": "POST",
+      "path": "/press",
+      "public": true
+    },
+    "search": {
+      "method": "POST",
+      "path": "/search",
+      "public": true
+    },
+    "text": {
+      "method": "POST",
+      "path": "/text",
+      "public": true
+    },
+    "wake": {
+      "method": "POST",
+      "path": "/wake",
+      "public": true
+    }
   }
 }
