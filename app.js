@@ -211,6 +211,11 @@ class TvRemoteApp extends Homey.App {
 
     await connection.connect();
     this._connection = connection;
+
+    // Reachable right now, which is the only moment its MAC can be looked up
+    // — and waking it later is impossible without one.
+    this.learnMac().catch(() => {});
+
     return connection;
   }
 
@@ -256,6 +261,17 @@ class TvRemoteApp extends Homey.App {
   async press(button) {
     const key = KEYS[button];
     if (!key) throw new Error(`Onbekende knop: ${button}`);
+
+    // The power button means "on" even when the television is too far gone to
+    // hear a key: unreachable is exactly the case a magic packet is for.
+    if (button === 'power') {
+      const reachable = await this.tryConnection();
+      if (!reachable) {
+        this.log('power -> unreachable, waking instead');
+        await this.wake();
+        return { ok: true, waking: true };
+      }
+    }
 
     const connection = await this.connection();
     connection.sendKey(key);

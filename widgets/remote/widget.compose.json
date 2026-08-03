@@ -21,10 +21,6 @@
     "text": {
       "method": "POST",
       "path": "/text"
-    },
-    "wake": {
-      "method": "POST",
-      "path": "/wake"
     }
   }
 }

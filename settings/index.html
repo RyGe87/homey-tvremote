@@ -50,10 +50,9 @@
     }
 
     .power { background: rgba(226, 74, 74, 0.22); font-size: 19px; }
-    .power.on { background: rgba(46, 173, 110, 0.26); }
-    .wake { background: rgba(233, 168, 46, 0.24); font-size: 18px; }
-    .wake.busy { animation: knock 1s ease-in-out infinite; }
+    .power.busy { animation: knock 1s ease-in-out infinite; }
     @keyframes knock { 50% { opacity: 0.45; } }
+    .power.on { background: rgba(46, 173, 110, 0.26); }
     .primary { background: rgba(31, 122, 236, 0.28); font-weight: 600; }
 
     .tabs { display: flex; gap: 8px; justify-content: center; }
@@ -163,7 +162,6 @@
       <div class="row">
         <button class="power" id="power" title="Aan/uit">&#9211;</button>
         <button data-button="mute">&#128263;</button>
-        <button class="wake" id="wake" title="Wekken">&#9889;</button>
         <button data-button="volume_down">&#8722;</button>
         <button data-button="volume_up">&#43;</button>
       </div>
@@ -257,6 +255,12 @@
     async function press(button) {
       try {
         const result = await call('/press', { button });
+        // The power button wakes a television that is past hearing keys.
+        if (result && result.waking) {
+          say('Tv niet bereikbaar — wekken…');
+          followWake();
+          return;
+        }
         if (result && typeof result.on === 'boolean') markPower(result.on);
         say('');
       } catch (err) {
@@ -409,37 +413,25 @@
       });
     }
 
-    function wireWake() {
-      const wake = document.getElementById('wake');
 
-      wake.addEventListener('click', async () => {
-        flash(wake);
-        wake.classList.add('busy');
-        wake.disabled = true;
-        say('Wekken… dit duurt tot anderhalve minuut');
-        try {
-          await call('/wake', {});
-          followWake();
-        } catch (err) {
-          wake.classList.remove('busy');
-          wake.disabled = false;
-          say(err.message || 'Wekken lukte niet', true);
-        }
-      });
-    }
-
+    /** Waking runs in the app and can take a minute and a half, so the power
+     *  button starts it and the status line follows along. */
     function followWake() {
-      const wake = document.getElementById('wake');
+      const power = document.getElementById('power');
+      power.classList.add('busy');
       clearInterval(statusTimer);
 
       statusTimer = setInterval(async () => {
         try {
           const result = await call('/status');
-          if (result && result.waking) { say('Wekken… de tv reageert nog niet'); return; }
+          if (result && result.waking) {
+            say('Wekken… de tv reageert nog niet');
+            return;
+          }
           clearInterval(statusTimer);
-          wake.classList.remove('busy');
-          wake.disabled = false;
+          power.classList.remove('busy');
           markPower(Boolean(result && result.on));
+
           if (result && result.wakeResult && result.wakeResult.ok) say('De tv is wakker');
           else if (result && result.wakeResult) say(result.wakeResult.error || 'De tv reageerde niet', true);
         } catch (err) {
@@ -452,7 +444,6 @@
     wirePad();
     wireScreens();
     wireSearch();
-    wireWake();
 
     call('/status')
       .then(result => {

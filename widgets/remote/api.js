@@ -17,7 +17,4 @@ module.exports = {
     return homey.app.sendText(body && body.term);
   },
 
-  async wake({ homey }) {
-    return homey.app.wake();
-  },
 };

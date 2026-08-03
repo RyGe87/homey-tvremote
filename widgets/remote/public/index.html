@@ -47,12 +47,10 @@
     button:disabled { opacity: 0.5; }
 
     .power { background: var(--homey-color-red-100, rgba(226, 74, 74, 0.16)); font-size: 18px; }
+    .power.busy { animation: knock 1s ease-in-out infinite; }
+    @keyframes knock { 50% { opacity: 0.45; } }
     .power.on { background: var(--homey-color-green-100, rgba(46, 173, 110, 0.2)); }
 
-    /* Waking is the emergency route, so it stands apart from the normal keys. */
-    .wake { background: var(--homey-color-yellow-100, rgba(233, 168, 46, 0.22)); font-size: 17px; }
-    .wake.busy { animation: knock 1s ease-in-out infinite; }
-    @keyframes knock { 50% { opacity: 0.45; } }
 
     /* Two screens side by side; swipe anywhere outside the touchpad. */
     .screens {
@@ -188,7 +186,6 @@
       <div class="row">
         <button class="power" id="power" title="Aan/uit">&#9211;</button>
         <button data-button="mute" title="Dempen">&#128263;</button>
-        <button class="wake" id="wake" title="Wekken met een magic packet">&#9889;</button>
         <button data-button="volume_down" title="Zachter">&#8722;</button>
         <button data-button="volume_up" title="Harder">&#43;</button>
       </div>
@@ -260,6 +257,12 @@
     async function press(button) {
       try {
         const result = await homey.api('POST', '/press', { button });
+        // The power button wakes a television that is past hearing keys.
+        if (result && result.waking) {
+          say('Tv niet bereikbaar — wekken…');
+          followWake();
+          return;
+        }
         if (result && typeof result.on === 'boolean') markPower(result.on);
         say('');
       } catch (err) {
@@ -450,29 +453,12 @@
 
 
 
-    /** Waking runs in the app and can take a minute and a half, so the
+
+    /** Waking runs in the app and can take a minute and a half, so the power
      *  button starts it and the status line follows along. */
-    function wireWake() {
-      const wake = document.getElementById('wake');
-
-      wake.addEventListener('click', async () => {
-        flash(wake);
-        wake.classList.add('busy');
-        wake.disabled = true;
-        say('Wekken… dit duurt tot anderhalve minuut');
-        try {
-          await homey.api('POST', '/wake', {});
-          followWake();
-        } catch (err) {
-          wake.classList.remove('busy');
-          wake.disabled = false;
-          say(err && err.message ? err.message : 'Wekken lukte niet', true);
-        }
-      });
-    }
-
     function followWake() {
-      const wake = document.getElementById('wake');
+      const power = document.getElementById('power');
+      power.classList.add('busy');
       clearInterval(statusTimer);
 
       statusTimer = setInterval(async () => {
@@ -483,15 +469,11 @@
             return;
           }
           clearInterval(statusTimer);
-          wake.classList.remove('busy');
-          wake.disabled = false;
+          power.classList.remove('busy');
           markPower(Boolean(result && result.on));
 
-          if (result && result.wakeResult && result.wakeResult.ok) {
-            say('De tv is wakker');
-          } else if (result && result.wakeResult) {
-            say(result.wakeResult.error || 'De tv reageerde niet', true);
-          }
+          if (result && result.wakeResult && result.wakeResult.ok) say('De tv is wakker');
+          else if (result && result.wakeResult) say(result.wakeResult.error || 'De tv reageerde niet', true);
         } catch (err) {
           // Keep polling; a hiccup while the television boots is expected.
         }
@@ -505,7 +487,6 @@
       wireScreens();
       wireSearch();
       wireText();
-      wireWake();
       Homey.ready();
 
       Homey.api('GET', '/status', {})
