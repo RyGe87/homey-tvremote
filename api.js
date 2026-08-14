@@ -24,6 +24,10 @@ module.exports = {
     return homey.app.search(body && body.service, body && body.term);
   },
 
+  async find({ homey, body }) {
+    return homey.app.find(body && body.term);
+  },
+
   async link({ homey, body }) {
     return homey.app.openLink(body && body.link);
   },

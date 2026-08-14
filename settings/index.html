@@ -145,6 +145,16 @@
       -webkit-appearance: none;
     }
 
+    /* Series titles run long, so the choices stack rather than share a row. */
+    .results { display: flex; flex-direction: column; gap: 8px; }
+    .results:empty { display: none; }
+    .results button {
+      text-align: left;
+      font-size: 15px;
+      padding: 13px 14px;
+      background: rgba(31, 122, 236, 0.16);
+    }
+
     .explain { font-size: 12px; opacity: 0.5; line-height: 1.5; margin: 2px 0; }
     .status { font-size: 12px; text-align: center; opacity: 0.6; min-height: 16px; }
     .status.error { color: #ff8a8a; opacity: 1; }
@@ -194,8 +204,9 @@
       <input type="search" id="term" placeholder="Zoekterm typen&hellip;"
              autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
       <div class="row">
-        <button data-search="crunchyroll">Crunchyroll</button>
+        <button id="crunchyroll">Crunchyroll</button>
       </div>
+      <div class="results" id="results"></div>
       <div class="row">
         <button data-search="youtube">YouTube</button>
         <button data-search="netflix">Netflix</button>
@@ -205,9 +216,10 @@
       </div>
       <p class="explain">
         YouTube en Netflix openen meteen op je zoekterm. Crunchyroll kent geen
-        zoekadres, dus die knop opent de app; ga daar naar het zoekvak en druk
-        dan op de knop hieronder — die zet je hele term er in één keer in, en
-        Enter in het zoekveld doet hetzelfde.
+        zoekadres, dus die knop zoekt hier en biedt je de drie beste reeksen
+        aan; tik er een en de tv springt er rechtstreeks naartoe. Staat er een
+        zoekveld open op de tv, dan zet de onderste knop je hele term er in
+        één keer in — Enter in het zoekveld doet hetzelfde.
       </p>
     </section>
 
@@ -404,6 +416,52 @@
       document.querySelectorAll('[data-search]').forEach(el => {
         el.addEventListener('click', () => { flash(el); go(el.dataset.search); });
       });
+
+      // Crunchyroll has no search address of its own, so the app searches on
+      // our behalf and offers what it found; a series does have an address.
+      const results = document.getElementById('results');
+      const clearResults = () => { results.textContent = ''; };
+
+      const offer = list => {
+        clearResults();
+        list.forEach(item => {
+          const choice = document.createElement('button');
+          choice.textContent = item.title;
+          choice.addEventListener('click', async () => {
+            flash(choice);
+            say('Openen op de tv…');
+            try {
+              await call('/link', { link: item.link });
+              say(`Geopend: ${item.title}`);
+              clearResults();
+              term.blur();
+            } catch (err) {
+              say(err.message || 'Openen lukte niet', true);
+            }
+          });
+          results.appendChild(choice);
+        });
+      };
+
+      const crunchyroll = document.getElementById('crunchyroll');
+      crunchyroll.addEventListener('click', async () => {
+        if (!term.value.trim()) { say('Typ eerst een zoekterm', true); return; }
+        flash(crunchyroll);
+        crunchyroll.disabled = true;
+        clearResults();
+        say('Zoeken bij Crunchyroll…');
+        try {
+          const result = await call('/find', { term: term.value });
+          if (result && result.ok) { offer(result.results); say('Kies een reeks'); }
+          else say((result && result.hint) || 'Niets gevonden', true);
+        } catch (err) {
+          say(err.message || 'Zoeken lukte niet', true);
+        }
+        crunchyroll.disabled = false;
+      });
+
+      // A new term makes the old choices meaningless.
+      term.addEventListener('input', clearResults);
 
       const send = document.getElementById('sendtext');
       const sendToField = async () => {

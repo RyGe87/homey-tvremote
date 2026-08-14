@@ -1,6 +1,6 @@
 {
   "id": "dev.rymenants.tvremote",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "compatibility": ">=12.3.0",
   "sdk": 3,
   "platforms": [
@@ -41,6 +41,11 @@
     "search": {
       "method": "POST",
       "path": "/search",
+      "public": true
+    },
+    "find": {
+      "method": "POST",
+      "path": "/find",
       "public": true
     },
     "link": {

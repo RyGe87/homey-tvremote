@@ -155,6 +155,16 @@
       -webkit-appearance: none;
     }
 
+    /* Series titles run long, so the choices stack rather than share a row. */
+    .results { display: flex; flex-direction: column; gap: 8px; }
+    .results:empty { display: none; }
+    .results button {
+      text-align: left;
+      font-size: 14px;
+      padding: 11px 12px;
+      background: var(--homey-color-blue-100, rgba(31, 122, 236, 0.16));
+    }
+
     .explain { font-size: 12px; opacity: 0.55; line-height: 1.45; margin: 2px 0; }
 
     /* Deliberately not a theme variable: on the dashboard that resolved to
@@ -219,8 +229,9 @@
              autocomplete="off" autocorrect="off" spellcheck="false"
              enterkeyhint="search">
       <div class="row">
-        <button data-search="crunchyroll">Crunchyroll</button>
+        <button id="crunchyroll">Crunchyroll</button>
       </div>
+      <div class="results" id="results"></div>
       <div class="row">
         <button data-search="youtube">YouTube</button>
         <button data-search="netflix">Netflix</button>
@@ -232,10 +243,11 @@
 
       <p class="explain">
         YouTube en Netflix openen meteen op je zoekterm. Crunchyroll kent geen
-        zoekadres, dus die knop opent de app; ga daar naar het zoekvak en druk
-        dan op de knop hieronder — die zet je hele term er in één keer in, en
-        Enter in het zoekveld doet hetzelfde. Koppelen doe je bij het toevoegen
-        van het apparaat.
+        zoekadres, dus die knop zoekt hier en biedt je de drie beste reeksen
+        aan; tik er een en de tv springt er rechtstreeks naartoe. Staat er een
+        zoekveld open op de tv, dan zet de onderste knop je hele term er in
+        één keer in — Enter in het zoekveld doet hetzelfde. Koppelen doe je bij
+        het toevoegen van het apparaat.
       </p>
     </section>
 
@@ -425,6 +437,55 @@
           go(el.dataset.search);
         });
       });
+
+      // Crunchyroll has no search address of its own, so the app searches on
+      // our behalf and offers what it found; a series does have an address.
+      const results = document.getElementById('results');
+      const clearResults = () => { results.textContent = ''; };
+
+      const offer = list => {
+        clearResults();
+        list.forEach(item => {
+          const choice = document.createElement('button');
+          choice.textContent = item.title;
+          choice.addEventListener('click', async () => {
+            flash(choice);
+            say('Openen op de tv…');
+            try {
+              await homey.api('POST', '/link', { link: item.link });
+              say(`Geopend: ${item.title}`);
+              clearResults();
+              term.blur();
+            } catch (err) {
+              say(err && err.message ? err.message : 'Openen lukte niet', true);
+            }
+          });
+          results.appendChild(choice);
+        });
+      };
+
+      const crunchyroll = document.getElementById('crunchyroll');
+      crunchyroll.addEventListener('click', async () => {
+        if (!term.value.trim()) {
+          say('Typ eerst een zoekterm', true);
+          return;
+        }
+        flash(crunchyroll);
+        crunchyroll.disabled = true;
+        clearResults();
+        say('Zoeken bij Crunchyroll…');
+        try {
+          const result = await homey.api('POST', '/find', { term: term.value });
+          if (result && result.ok) { offer(result.results); say('Kies een reeks'); }
+          else say((result && result.hint) || 'Niets gevonden', true);
+        } catch (err) {
+          say(err && err.message ? err.message : 'Zoeken lukte niet', true);
+        }
+        crunchyroll.disabled = false;
+      });
+
+      // A new term makes the old choices meaningless.
+      term.addEventListener('input', clearResults);
     }
 
     /** Real text input needs its own pairing, so the offer only appears

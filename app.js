@@ -2,6 +2,7 @@
 
 const Homey = require('homey');
 const dgram = require('dgram');
+const https = require('https');
 const os = require('os');
 
 const { generateCertificate } = require('./lib/androidtv/certificate');
@@ -53,6 +54,15 @@ const SERVICES = {
       + '"Stuur naar het veld op de tv".',
   },
 };
+
+// Crunchyroll has no search address, but a series does — so the searching is
+// done here and only the answer goes to the television. Its own apps talk to
+// this host, which unlike the website sits in front of no challenge a remote
+// control could never solve, and the web client's credentials are public:
+// they ship in the site's own JavaScript, and buy an anonymous hour.
+const CR_HOST = 'beta-api.crunchyroll.com';
+const CR_AUTH = 'Basic Y3Jfd2ViOg==';
+const CR_RESULTS = 3;
 
 // Offered in the flow card. The protocol knows some three hundred key codes;
 // this is the handful anyone actually puts in a flow.
@@ -343,6 +353,117 @@ class TvRemoteApp extends Homey.App {
       if (now && now !== before) return now;
     }
     return null;
+  }
+
+  // -------------------------------------------------------------------
+  // Searching Crunchyroll, which happens here rather than on the television
+  // -------------------------------------------------------------------
+
+  /** A small JSON request, so this app keeps to its one dependency. */
+  requestJson({ host, path, method = 'GET', headers = {}, body = null }) {
+    return new Promise((resolve, reject) => {
+      const request = https.request({ host, path, method, headers, timeout: 15000 }, response => {
+        let text = '';
+        response.setEncoding('utf8');
+        response.on('data', chunk => { text += chunk; });
+        response.on('end', () => {
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            reject(new Error(`Crunchyroll antwoordde met ${response.statusCode}`));
+            return;
+          }
+          try {
+            resolve(JSON.parse(text));
+          } catch (err) {
+            reject(new Error('Onleesbaar antwoord van Crunchyroll'));
+          }
+        });
+      });
+
+      request.on('timeout', () => request.destroy(new Error('Crunchyroll antwoordde niet op tijd')));
+      request.on('error', reject);
+      if (body) request.write(body);
+      request.end();
+    });
+  }
+
+  /** An anonymous token, kept for the hour it lasts. */
+  async crunchyrollToken() {
+    if (this._crToken && this._crToken.until > Date.now()) return this._crToken.value;
+
+    const body = 'grant_type=client_id';
+    const answer = await this.requestJson({
+      host: CR_HOST,
+      path: '/auth/v1/token',
+      method: 'POST',
+      headers: {
+        Authorization: CR_AUTH,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(body),
+      },
+      body,
+    });
+
+    if (!answer.access_token) throw new Error('Crunchyroll gaf geen toegangssleutel');
+
+    // Retire it a minute early rather than find out halfway through a search.
+    const seconds = Number(answer.expires_in) || 3600;
+    this._crToken = { value: answer.access_token, until: Date.now() + ((seconds - 60) * 1000) };
+    return this._crToken.value;
+  }
+
+  /** The first few series for a term, each with the address that opens it.
+   *  A series is one of the handful of paths the app genuinely claims. */
+  async crunchyrollSearch(term) {
+    const token = await this.crunchyrollToken();
+    const query = new URLSearchParams({
+      q: term, n: String(CR_RESULTS), type: 'series', locale: 'nl-NL',
+    });
+
+    const answer = await this.requestJson({
+      host: CR_HOST,
+      path: `/content/v2/discover/search?${query}`,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const found = [];
+    for (const section of answer.data || []) {
+      for (const item of section.items || []) {
+        if (item.id && item.title) {
+          found.push({
+            id: item.id,
+            title: item.title,
+            link: `https://www.crunchyroll.com/series/${item.id}`,
+          });
+        }
+      }
+    }
+    return found.slice(0, CR_RESULTS);
+  }
+
+  /** What the Crunchyroll button asks for. An undocumented interface can
+   *  vanish without notice, so a failure opens the app and says what to do
+   *  instead of leaving the viewer holding nothing. */
+  async find(term) {
+    const value = String(term || '').trim();
+    if (!value) throw new Error('Geen zoekterm ingevuld');
+
+    try {
+      const results = await this.crunchyrollSearch(value);
+      if (!results.length) {
+        return { ok: false, results: [], hint: `Crunchyroll vond niets voor "${value}".` };
+      }
+      this.log(`crunchyroll "${value}": ${results.map(r => r.title).join(' | ')}`);
+      return { ok: true, results };
+    } catch (err) {
+      this.error(`crunchyroll search failed: ${err.message}`);
+      await this.openLink('crunchyroll://').catch(() => {});
+      return {
+        ok: false,
+        results: [],
+        hint: 'Zoeken bij Crunchyroll lukte niet, dus de app staat nu gewoon open. '
+          + 'Ga naar het zoekvak en gebruik "Stuur naar het veld op de tv".',
+      };
+    }
   }
 
   async openLink(link) {
