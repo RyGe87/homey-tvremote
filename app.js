@@ -34,19 +34,13 @@ const KEYS = {
 const SERVICES = {
   youtube: { link: q => `https://www.youtube.com/results?search_query=${q}` },
   netflix: { link: q => `https://www.netflix.com/search?q=${q}` },
-  // Read out of the app's own manifest (3.115.0). Its StartupActivity accepts
-  // exactly this and nothing more:
-  //
-  //   crunchyroll://          any path, which is why every variant merely
-  //   crunchyroll://open      opened the app and then sat there
-  //   https://(www.)crunchyroll.com/watch/…  /series/…  /artist/…
-  //   https://(www.)crunchyroll.com/activate  /offer-inpremium
-  //
-  // There is no search path and no ACTION_SEARCH anywhere in the manifest, so
-  // no address exists that carries a term into the app; /search?q=… matches
-  // nothing, which is the television answering "no app knows how to process
-  // this request". The button therefore opens the app, and the term goes in
-  // the way that does work: through the text field, once one is open.
+  // Read out of the app's own manifest (3.115.0) and its code. There is no
+  // search path anywhere and no ACTION_SEARCH, so no address carries a term
+  // into the app — /search?q=… matches nothing, which is the television
+  // answering "no app knows how to process this request". Searching therefore
+  // happens in this app instead, and only a series address is sent; see
+  // crunchyrollSearch. This entry is what remains for when that fails: the
+  // bare scheme, which opens the app and asks nothing of anyone.
   crunchyroll: {
     link: () => 'crunchyroll://',
     termless: true,
@@ -412,7 +406,16 @@ class TvRemoteApp extends Homey.App {
   }
 
   /** The first few series for a term, each with the address that opens it.
-   *  A series is one of the handful of paths the app genuinely claims. */
+   *
+   *  Over crunchyroll:// rather than the https address that means the same
+   *  thing. The app declares both, but its https filter carries
+   *  autoVerify="true", so Android routes those links only once it has read
+   *  crunchyroll.com/.well-known/assetlinks.json and verified the domain —
+   *  and that file sits behind a challenge the verifier cannot pass. On a
+   *  television, where there is no browser to fall back to, the set then
+   *  answers that no app can handle the link. A private scheme needs no
+   *  verification and lands every time.
+   */
   async crunchyrollSearch(term) {
     const token = await this.crunchyrollToken();
     const query = new URLSearchParams({
@@ -432,7 +435,7 @@ class TvRemoteApp extends Homey.App {
           found.push({
             id: item.id,
             title: item.title,
-            link: `https://www.crunchyroll.com/series/${item.id}`,
+            link: `crunchyroll://series/${item.id}`,
           });
         }
       }
