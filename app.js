@@ -27,6 +27,25 @@ const KEYS = {
   power: 'KEYCODE_POWER',
 };
 
+// What each button on the search screen sends. A television opens a link only
+// when an installed app claims that exact address, so these are not a matter
+// of taste: they were measured against this set, one candidate at a time.
+const SERVICES = {
+  youtube: { link: q => `https://www.youtube.com/results?search_query=${q}` },
+  netflix: { link: q => `https://www.netflix.com/search?q=${q}` },
+  // Crunchyroll claims crunchyroll:// and nothing else — not its own web
+  // addresses, not market://launch?id=…, and no path behind the scheme
+  // reaches the search screen; every variant lands on the app's front page
+  // with no text field in sight. So this button opens the app, and the term
+  // goes in the way that does work: through the field, once one is open.
+  crunchyroll: {
+    link: () => 'crunchyroll://',
+    termless: true,
+    hint: 'Crunchyroll staat open. Zet de cursor in het zoekvak en druk dan op '
+      + '"Stuur naar het veld op de tv".',
+  },
+};
+
 // Offered in the flow card. The protocol knows some three hundred key codes;
 // this is the handful anyone actually puts in a flow.
 const FLOW_KEYS = [
@@ -282,15 +301,13 @@ class TvRemoteApp extends Homey.App {
   }
 
   buildSearchLink(service, term) {
-    const q = encodeURIComponent(String(term || '').trim());
-    if (!q) throw new Error('Geen zoekterm ingevuld');
+    const entry = SERVICES[service];
+    if (!entry) throw new Error(`Onbekende dienst: ${service}`);
 
-    switch (service) {
-      case 'youtube': return `https://www.youtube.com/results?search_query=${q}`;
-      case 'netflix': return `https://www.netflix.com/search?q=${q}`;
-      case 'crunchyroll': return `https://www.crunchyroll.com/search?q=${q}`;
-      default: throw new Error(`Onbekende dienst: ${service}`);
-    }
+    const q = encodeURIComponent(String(term || '').trim());
+    // Only the services that carry the term in their address need one.
+    if (!q && !entry.termless) throw new Error('Geen zoekterm ingevuld');
+    return entry.link(q);
   }
 
   async search(service, term) {
@@ -305,7 +322,7 @@ class TvRemoteApp extends Homey.App {
     // for it to name a new app in front is the only proof we get.
     const app = await this.awaitApp(connection, before);
     if (app) this.log(`search ${service} opened ${app}`);
-    return { ok: true, link, app };
+    return { ok: true, link, app, hint: SERVICES[service].hint || null };
   }
 
   /** The package the television reports in front, once it differs from what
@@ -321,13 +338,20 @@ class TvRemoteApp extends Homey.App {
   }
 
   async openLink(link) {
-    if (!/^https?:\/\//i.test(String(link || ''))) {
-      throw new Error('Geef een link die met http(s):// begint');
+    const value = String(link || '').trim();
+    // Any scheme an installed app can claim, not only the web: several apps
+    // are reachable at all through their own, as crunchyroll:// is.
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
+      throw new Error('Geef een link met een schema, bijvoorbeeld https:// of crunchyroll://');
     }
     const connection = await this.connection();
-    connection.sendAppLink(link);
-    this.log(`open link: ${link}`);
-    return { ok: true, link };
+    const before = connection.currentApp;
+    connection.sendAppLink(value);
+    this.log(`open link: ${value}`);
+
+    const app = await this.awaitApp(connection, before);
+    if (app) this.log(`link opened ${app}`);
+    return { ok: true, link: value, app };
   }
 
   /** Types a whole word into the text field the television has open,

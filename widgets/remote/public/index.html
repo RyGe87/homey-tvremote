@@ -231,10 +231,11 @@
 
 
       <p class="explain">
-        De bovenste drie knoppen openen zoekresultaten rechtstreeks; Enter in het
-        zoekveld doet hetzelfde als Crunchyroll. Staat er een zoekveld open op de
-        tv, dan zet de knop daaronder je hele term er in één keer in. Koppelen doe
-        je bij het toevoegen van het apparaat.
+        YouTube en Netflix openen meteen op je zoekterm. Crunchyroll kent geen
+        zoekadres, dus die knop opent de app; ga daar naar het zoekvak en druk
+        dan op de knop hieronder — die zet je hele term er in één keer in, en
+        Enter in het zoekveld doet hetzelfde. Koppelen doe je bij het toevoegen
+        van het apparaat.
       </p>
     </section>
 
@@ -401,20 +402,20 @@
     function wireSearch() {
       const term = document.getElementById('term');
 
+      // Whether a term is required depends on the service, and only the app
+      // knows which: Crunchyroll's button opens the app and ignores it.
       const go = async service => {
-        if (!term.value.trim()) {
-          say('Typ eerst een zoekterm', true);
-          return;
-        }
-        say('Zoeken op de tv…');
+        say('Naar de tv sturen…');
         try {
           const result = await homey.api('POST', '/search', { service, term: term.value });
-          // The television names the app it opened when the link landed; when
-          // it says nothing, all we honestly know is that we sent it.
-          say(result && result.app ? `Geopend op de tv: ${result.app}` : 'Gestuurd naar de tv');
+          // A service that cannot search by address says what to do next
+          // itself; otherwise the television names the app it opened, and
+          // when it says nothing, all we honestly know is that we sent it.
+          say((result && result.hint)
+            || (result && result.app ? `Geopend op de tv: ${result.app}` : 'Gestuurd naar de tv'));
           term.blur();
         } catch (err) {
-          say(err && err.message ? err.message : 'Zoeken lukte niet', true);
+          say(err && err.message ? err.message : 'Openen lukte niet', true);
         }
       };
 
@@ -424,11 +425,6 @@
           go(el.dataset.search);
         });
       });
-
-      term.addEventListener('keydown', event => {
-        if (event.key === 'Enter') go('crunchyroll');
-      });
-
     }
 
     /** Real text input needs its own pairing, so the offer only appears
@@ -438,7 +434,7 @@
       const term = document.getElementById('term');
       const button = document.getElementById('sendtext');
 
-      button.addEventListener('click', async () => {
+      const sendToField = async () => {
         if (!term.value.trim()) {
           say('Typ eerst een zoekterm', true);
           return;
@@ -454,6 +450,12 @@
           say(err && err.message ? err.message : 'Versturen lukte niet', true);
         }
         button.disabled = false;
+      };
+
+      button.addEventListener('click', sendToField);
+      // Enter does the thing you came for: the term into the field on the tv.
+      term.addEventListener('keydown', event => {
+        if (event.key === 'Enter') sendToField();
       });
     }
 

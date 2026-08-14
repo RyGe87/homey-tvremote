@@ -204,9 +204,10 @@
         <button id="sendtext" class="primary">&#9998; Stuur naar het veld op de tv</button>
       </div>
       <p class="explain">
-        De bovenste drie knoppen openen zoekresultaten rechtstreeks; Enter in het
-        zoekveld doet hetzelfde als Crunchyroll. Staat er een zoekveld open op de tv,
-        dan zet de knop daaronder je hele term er in één keer in.
+        YouTube en Netflix openen meteen op je zoekterm. Crunchyroll kent geen
+        zoekadres, dus die knop opent de app; ga daar naar het zoekvak en druk
+        dan op de knop hieronder — die zet je hele term er in één keer in, en
+        Enter in het zoekveld doet hetzelfde.
       </p>
     </section>
 
@@ -383,27 +384,29 @@
     function wireSearch() {
       const term = document.getElementById('term');
 
+      // Whether a term is required depends on the service, and only the app
+      // knows which: Crunchyroll's button opens the app and ignores it.
       const go = async service => {
-        if (!term.value.trim()) { say('Typ eerst een zoekterm', true); return; }
-        say('Zoeken op de tv…');
+        say('Naar de tv sturen…');
         try {
           const result = await call('/search', { service, term: term.value });
-          // The television names the app it opened when the link landed; when
-          // it says nothing, all we honestly know is that we sent it.
-          say(result && result.app ? `Geopend op de tv: ${result.app}` : 'Gestuurd naar de tv');
+          // A service that cannot search by address says what to do next
+          // itself; otherwise the television names the app it opened, and
+          // when it says nothing, all we honestly know is that we sent it.
+          say((result && result.hint)
+            || (result && result.app ? `Geopend op de tv: ${result.app}` : 'Gestuurd naar de tv'));
           term.blur();
         } catch (err) {
-          say(err.message || 'Zoeken lukte niet', true);
+          say(err.message || 'Openen lukte niet', true);
         }
       };
 
       document.querySelectorAll('[data-search]').forEach(el => {
         el.addEventListener('click', () => { flash(el); go(el.dataset.search); });
       });
-      term.addEventListener('keydown', e => { if (e.key === 'Enter') go('crunchyroll'); });
 
       const send = document.getElementById('sendtext');
-      send.addEventListener('click', async () => {
+      const sendToField = async () => {
         if (!term.value.trim()) { say('Typ eerst een zoekterm', true); return; }
         flash(send);
         send.disabled = true;
@@ -416,7 +419,11 @@
           say(err.message || 'Versturen lukte niet', true);
         }
         send.disabled = false;
-      });
+      };
+
+      send.addEventListener('click', sendToField);
+      // Enter does the thing you came for: the term into the field on the tv.
+      term.addEventListener('keydown', e => { if (e.key === 'Enter') sendToField(); });
     }
 
 
