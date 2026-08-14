@@ -194,6 +194,9 @@
       <input type="search" id="term" placeholder="Zoekterm typen&hellip;"
              autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
       <div class="row">
+        <button data-search="crunchyroll">Crunchyroll</button>
+      </div>
+      <div class="row">
         <button data-search="youtube">YouTube</button>
         <button data-search="netflix">Netflix</button>
       </div>
@@ -201,8 +204,9 @@
         <button id="sendtext" class="primary">&#9998; Stuur naar het veld op de tv</button>
       </div>
       <p class="explain">
-        De bovenste twee knoppen openen zoekresultaten rechtstreeks. Staat er een
-        zoekveld open op de tv, dan zet de knop daaronder je hele term er in één keer in.
+        De bovenste drie knoppen openen zoekresultaten rechtstreeks; Enter in het
+        zoekveld doet hetzelfde als Crunchyroll. Staat er een zoekveld open op de tv,
+        dan zet de knop daaronder je hele term er in één keer in.
       </p>
     </section>
 
@@ -383,8 +387,10 @@
         if (!term.value.trim()) { say('Typ eerst een zoekterm', true); return; }
         say('Zoeken op de tv…');
         try {
-          await call('/search', { service, term: term.value });
-          say('Gestuurd naar de tv');
+          const result = await call('/search', { service, term: term.value });
+          // The television names the app it opened when the link landed; when
+          // it says nothing, all we honestly know is that we sent it.
+          say(result && result.app ? `Geopend op de tv: ${result.app}` : 'Gestuurd naar de tv');
           term.blur();
         } catch (err) {
           say(err.message || 'Zoeken lukte niet', true);
@@ -394,7 +400,7 @@
       document.querySelectorAll('[data-search]').forEach(el => {
         el.addEventListener('click', () => { flash(el); go(el.dataset.search); });
       });
-      term.addEventListener('keydown', e => { if (e.key === 'Enter') go('youtube'); });
+      term.addEventListener('keydown', e => { if (e.key === 'Enter') go('crunchyroll'); });
 
       const send = document.getElementById('sendtext');
       send.addEventListener('click', async () => {

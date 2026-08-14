@@ -288,6 +288,7 @@ class TvRemoteApp extends Homey.App {
     switch (service) {
       case 'youtube': return `https://www.youtube.com/results?search_query=${q}`;
       case 'netflix': return `https://www.netflix.com/search?q=${q}`;
+      case 'crunchyroll': return `https://www.crunchyroll.com/search?q=${q}`;
       default: throw new Error(`Onbekende dienst: ${service}`);
     }
   }
@@ -295,9 +296,28 @@ class TvRemoteApp extends Homey.App {
   async search(service, term) {
     const link = this.buildSearchLink(service, term);
     const connection = await this.connection();
+    const before = connection.currentApp;
     connection.sendAppLink(link);
     this.log(`search ${service}: ${link}`);
-    return { ok: true, link };
+
+    // A link only lands when an installed app claims that address; nothing
+    // claims it, nothing happens, and the television stays silent. Waiting
+    // for it to name a new app in front is the only proof we get.
+    const app = await this.awaitApp(connection, before);
+    if (app) this.log(`search ${service} opened ${app}`);
+    return { ok: true, link, app };
+  }
+
+  /** The package the television reports in front, once it differs from what
+   *  was there before — or null when it says nothing within a second and a
+   *  half. Silence is not a failure: some sets never report at all. */
+  async awaitApp(connection, before) {
+    for (let i = 0; i < 10; i += 1) {
+      await new Promise(resolve => this.homey.setTimeout(resolve, 150));
+      const now = connection.currentApp;
+      if (now && now !== before) return now;
+    }
+    return null;
   }
 
   async openLink(link) {
@@ -318,6 +338,27 @@ class TvRemoteApp extends Homey.App {
     if (!value) throw new Error('Geen tekst opgegeven');
 
     let connection = await this.connection();
+
+    // A television announces the open text field at the moment it opens it.
+    // Connect after the viewer already stepped into a search box and we never
+    // heard the announcement — and an edit that names no field is dropped
+    // without a word, which looks exactly like the television ignoring us.
+    if (!connection.hasTextField()) {
+      this.log('No field announced yet; asking the television to say which is open');
+      connection.requestField();
+      await new Promise(resolve => this.homey.setTimeout(resolve, 700));
+    }
+
+    if (!connection.hasTextField()) {
+      return {
+        ok: false,
+        field: null,
+        fieldKnown: false,
+        hint: 'De tv laat niet weten welk tekstvak openstaat. Ga op de tv even uit '
+          + 'het zoekvak en klik het opnieuw aan — dan meldt ze het veld en lukt het.',
+      };
+    }
+
     let field = await this.attemptText(connection, value, replace);
 
     // No confirmation means the field identifier we quoted was stale — the
@@ -335,8 +376,9 @@ class TvRemoteApp extends Homey.App {
       return {
         ok: false,
         field: null,
-        hint: 'De tv nam de tekst niet aan. Staat de cursor echt in een '
-          + 'tekstvak op het scherm?',
+        fieldKnown: true,
+        hint: 'De tv kent het tekstvak wel, maar nam de bewerking niet aan. '
+          + 'Staat de cursor nog in datzelfde vak?',
       };
     }
 

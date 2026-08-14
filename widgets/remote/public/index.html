@@ -219,6 +219,9 @@
              autocomplete="off" autocorrect="off" spellcheck="false"
              enterkeyhint="search">
       <div class="row">
+        <button data-search="crunchyroll">Crunchyroll</button>
+      </div>
+      <div class="row">
         <button data-search="youtube">YouTube</button>
         <button data-search="netflix">Netflix</button>
       </div>
@@ -228,9 +231,10 @@
 
 
       <p class="explain">
-        De bovenste twee knoppen openen zoekresultaten rechtstreeks. Staat er een
-        zoekveld open op de tv, dan zet de knop daaronder je hele term er in
-        één keer in. Koppelen doe je bij het toevoegen van het apparaat.
+        De bovenste drie knoppen openen zoekresultaten rechtstreeks; Enter in het
+        zoekveld doet hetzelfde als Crunchyroll. Staat er een zoekveld open op de
+        tv, dan zet de knop daaronder je hele term er in één keer in. Koppelen doe
+        je bij het toevoegen van het apparaat.
       </p>
     </section>
 
@@ -404,8 +408,10 @@
         }
         say('Zoeken op de tv…');
         try {
-          await homey.api('POST', '/search', { service, term: term.value });
-          say('Gestuurd naar de tv');
+          const result = await homey.api('POST', '/search', { service, term: term.value });
+          // The television names the app it opened when the link landed; when
+          // it says nothing, all we honestly know is that we sent it.
+          say(result && result.app ? `Geopend op de tv: ${result.app}` : 'Gestuurd naar de tv');
           term.blur();
         } catch (err) {
           say(err && err.message ? err.message : 'Zoeken lukte niet', true);
@@ -420,7 +426,7 @@
       });
 
       term.addEventListener('keydown', event => {
-        if (event.key === 'Enter') go('youtube');
+        if (event.key === 'Enter') go('crunchyroll');
       });
 
     }
