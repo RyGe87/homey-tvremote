@@ -33,11 +33,19 @@ const KEYS = {
 const SERVICES = {
   youtube: { link: q => `https://www.youtube.com/results?search_query=${q}` },
   netflix: { link: q => `https://www.netflix.com/search?q=${q}` },
-  // Crunchyroll claims crunchyroll:// and nothing else — not its own web
-  // addresses, not market://launch?id=…, and no path behind the scheme
-  // reaches the search screen; every variant lands on the app's front page
-  // with no text field in sight. So this button opens the app, and the term
-  // goes in the way that does work: through the field, once one is open.
+  // Read out of the app's own manifest (3.115.0). Its StartupActivity accepts
+  // exactly this and nothing more:
+  //
+  //   crunchyroll://          any path, which is why every variant merely
+  //   crunchyroll://open      opened the app and then sat there
+  //   https://(www.)crunchyroll.com/watch/…  /series/…  /artist/…
+  //   https://(www.)crunchyroll.com/activate  /offer-inpremium
+  //
+  // There is no search path and no ACTION_SEARCH anywhere in the manifest, so
+  // no address exists that carries a term into the app; /search?q=… matches
+  // nothing, which is the television answering "no app knows how to process
+  // this request". The button therefore opens the app, and the term goes in
+  // the way that does work: through the text field, once one is open.
   crunchyroll: {
     link: () => 'crunchyroll://',
     termless: true,
